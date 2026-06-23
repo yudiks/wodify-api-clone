@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Leads ----------
+
+model LeadStatus {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  leads Lead[]
+}
+
+model Lead {
+  id          Int        @id @default(autoincrement())
+  firstName   String
+  lastName    String
+  email       String?
+  phone       String?
+  source      String?
+  statusId    Int?
+  status      LeadStatus? @relation(fields: [statusId], references: [id])
+  notes       String?
+  createdDate DateTime   @default(now())
+  modifiedDate DateTime  @updatedAt
+}
+
+// ---------- Clients ----------
+
+model ClientStatus {
+  id      Int      @id @default(autoincrement())
+  name    String   @unique
+  clients Client[]
+}
+
+model Client {
+  id           Int           @id @default(autoincrement())
+  firstName    String
+  lastName     String
+  email        String?
+  phone        String?
+  statusId     Int?
+  status       ClientStatus? @relation(fields: [statusId], references: [id])
+  isActive     Boolean       @default(true)
+  isSuspended  Boolean       @default(false)
+  createdDate  DateTime      @default(now())
+  modifiedDate DateTime      @updatedAt
+
+  memberships  Membership[]
+  invoices     Invoice[]
+  reservations ClassReservation[]
+  signIns      ClassSignIn[]
+}
+
+// ---------- Memberships ----------
+
+model MembershipTemplate {
+  id          Int          @id @default(autoincrement())
+  name        String
+  description String?
+  price       Decimal      @default(0) @db.Decimal(10, 2)
+  createdDate DateTime     @default(now())
+  memberships Membership[]
+}
+
+model Membership {
+  id           Int                 @id @default(autoincrement())
+  clientId     Int
+  client       Client              @relation(fields: [clientId], references: [id])
+  templateId   Int
+  template     MembershipTemplate  @relation(fields: [templateId], references: [id])
+  startDate    DateTime            @default(now())
+  endDate      DateTime?
+  isActive     Boolean             @default(true)
+  autoRenew    Boolean             @default(true)
+  createdDate  DateTime            @default(now())
+  modifiedDate DateTime            @updatedAt
+}
+
+// ---------- Financials ----------
+
+model Invoice {
+  id           Int           @id @default(autoincrement())
+  clientId     Int
+  client       Client        @relation(fields: [clientId], references: [id])
+  amount       Decimal       @db.Decimal(10, 2)
+  status       String        @default("Open")
+  issueDate    DateTime      @default(now())
+  dueDate      DateTime?
+  transactions Transaction[]
+}
+
+model Transaction {
+  id        Int      @id @default(autoincrement())
+  invoiceId Int
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  amount    Decimal  @db.Decimal(10, 2)
+  method    String   @default("Card")
+  status    String   @default("Completed")
+  createdDate DateTime @default(now())
+}
+
+model Discount {
+  id          Int     @id @default(autoincrement())
+  name        String
+  type        String  @default("Percent") // Percent | Fixed
+  value       Decimal @db.Decimal(10, 2)
+  isActive    Boolean @default(true)
+}
+
+// ---------- Programs & Classes ----------
+
+model Class {
+  id           Int                @id @default(autoincrement())
+  name         String
+  program      String?
+  startDateTime DateTime
+  endDateTime   DateTime
+  capacity     Int                @default(20)
+  location     String?
+  reservations ClassReservation[]
+  signIns      ClassSignIn[]
+}
+
+model ClassReservation {
+  id        Int      @id @default(autoincrement())
+  classId   Int
+  class     Class    @relation(fields: [classId], references: [id])
+  clientId  Int
+  client    Client   @relation(fields: [clientId], references: [id])
+  status    String   @default("Reserved") // Reserved | Cancelled | Waitlisted
+  createdDate DateTime @default(now())
+}
+
+model ClassSignIn {
+  id        Int      @id @default(autoincrement())
+  classId   Int
+  class     Class    @relation(fields: [classId], references: [id])
+  clientId  Int
+  client    Client   @relation(fields: [clientId], references: [id])
+  signedInAt DateTime @default(now())
+}
+
+// ---------- Workouts ----------
+
+model Workout {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  type        String?
+  components  String?
+  createdDate DateTime @default(now())
+  modifiedDate DateTime @updatedAt
+}

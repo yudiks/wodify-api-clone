@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Wodify API Clone
 
-## Getting Started
+A self-contained clone of a subset of the [Wodify API](https://docs.wodify.com/), built with Next.js (App Router), Prisma 7, and Postgres — deployable on Vercel with a serverless Postgres database (Vercel Postgres / Neon). Includes a simple admin UI for browsing and managing every resource.
 
-First, run the development server:
+See `../WODIFY_API_REFERENCE.md` for the original API summary this clone is based on.
+
+## Scope
+
+Implements core CRUD/list/search for:
+
+- **Leads** — `/api/v1/leads`, `/api/v1/lead-statuses`
+- **Clients** — `/api/v1/clients` (+ deactivate/reactivate/suspend/reinstate), `/api/v1/client-statuses`
+- **Memberships** — `/api/v1/membership-templates`, `/api/v1/memberships` (+ deactivate)
+- **Financials** — `/api/v1/invoices`, `/api/v1/transactions/:id`, `/api/v1/discounts` (read-only, seeded data)
+- **Programs & Classes** — `/api/v1/classes`, reservations (`/api/v1/classes/:id/reservations`, `/api/v1/reservations`, cancel), sign-ins (`/api/v1/classes/:id/sign-ins`, `/api/v1/sign-ins`)
+- **Workouts** — `/api/v1/workouts`
+
+All list/search endpoints accept Wodify's `q=field|operator|value` syntax (operators: `eq`, `neq`, `lt`, `lte`, `gt`, `gte`, `like`, `in`, `not_in`, `between`, `is_null`, `not_null`; conditions joined with `;` are AND'd) plus `page`/`pageSize` pagination. Auth and rate limiting are intentionally omitted (by request).
+
+The long tail of the real API (tags, groups, holds, tasks/communications, document templates, generic cross-type "bookings") is out of scope.
+
+## Local setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env   # then set DATABASE_URL to a Postgres connection string
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+If you don't have a Postgres instance handy, Prisma can run one locally for you:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npx prisma dev -n wodify --detach   # prints a DATABASE_URL — put it in .env
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Apply the schema and generate the client:
 
-## Learn More
+```bash
+npx prisma generate
+# Against a fresh database, apply prisma/migrations/0_init/migration.sql with any
+# Postgres client (e.g. `psql -f prisma/migrations/0_init/migration.sql`), or run
+# `npx prisma migrate dev` against a standard hosted Postgres instance.
+```
 
-To learn more about Next.js, take a look at the following resources:
+Seed sample data, then run the app:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run db:seed
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Run tests (uses the same `DATABASE_URL`; each test file truncates all tables before running):
 
-## Deploy on Vercel
+```bash
+npm test
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Build for production:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run build
+```
+
+## Deploying to Vercel
+
+1. Create a Postgres database (Vercel Postgres / Neon via the Vercel Marketplace) and link it to the project.
+2. Set `DATABASE_URL` in the project's Vercel environment variables.
+3. Apply `prisma/migrations/0_init/migration.sql` to that database, then run `npm run db:seed` once if you want sample data.
+4. Deploy. `next build` compiles the app; Prisma Client is generated from `prisma/schema.prisma` (run `npx prisma generate` as part of your build if it isn't already cached in `node_modules`).
