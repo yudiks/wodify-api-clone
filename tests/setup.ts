@@ -8,6 +8,7 @@ beforeEach(async () => {
     await prisma.workoutResult.deleteMany();
     await prisma.workoutExercise.deleteMany();
     await prisma.class.deleteMany();
+    await prisma.coach.deleteMany();
     await prisma.workoutSection.deleteMany();
     await prisma.workout.deleteMany();
     await prisma.transaction.deleteMany();

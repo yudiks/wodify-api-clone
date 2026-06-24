@@ -27,17 +27,22 @@ function LookupCombobox({
   value,
   onChange,
   required,
+  initialLabel,
 }: {
   lookup: NonNullable<FieldConfig["lookup"]>;
   value: string;
   onChange: (id: string) => void;
   required?: boolean;
+  /** Pre-resolved display label for `value`, e.g. when editing an existing record. */
+  initialLabel?: string;
 }) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialLabel ?? "");
   const [options, setOptions] = useState<LookupOption[]>([]);
   const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
-  const [selected, setSelected] = useState<LookupOption | null>(null);
+  const [selected, setSelected] = useState<LookupOption | null>(
+    value && initialLabel ? { id: Number(value), label: initialLabel } : null
+  );
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -135,16 +140,42 @@ function LookupCombobox({
   );
 }
 
-function CreateResourceModal({
+/** Converts a UTC ISO timestamp to the local wall-clock string <input type="datetime-local"> expects/displays. */
+function toDatetimeLocalValue(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Formats a row's raw field value into the string a form input expects (e.g. ISO -> local datetime-local). */
+function initialFieldValue(field: FieldConfig, row: Row): string {
+  const raw = row[field.key];
+  if (raw === null || raw === undefined) return "";
+  if (field.type === "datetime" && typeof raw === "string") return toDatetimeLocalValue(raw);
+  return String(raw);
+}
+
+function ResourceFormModal({
   config,
+  row,
+  lookupMaps,
   onClose,
-  onCreated,
+  onSaved,
 }: {
   config: ResourceConfig;
+  /** Present when editing an existing row; absent when creating a new one. */
+  row?: Row;
+  /** Column-level nameLookup maps already resolved by the list, reused to pre-label lookup fields when editing. */
+  lookupMaps: Record<string, Map<number, string>>;
   onClose: () => void;
-  onCreated: () => void;
+  onSaved: () => void;
 }) {
-  const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const isEdit = !!row;
+  const [formValues, setFormValues] = useState<Record<string, string>>(() =>
+    row
+      ? Object.fromEntries(config.fields.map((field) => [field.key, initialFieldValue(field, row)]))
+      : {}
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -153,17 +184,18 @@ function CreateResourceModal({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(config.basePath, {
-        method: "POST",
+      const url = isEdit ? `${config.basePath}/${row!.id}` : config.basePath;
+      const res = await fetch(url, {
+        method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formValues),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Create failed");
-      onCreated();
+      if (!res.ok) throw new Error(json.error ?? (isEdit ? "Update failed" : "Create failed"));
+      onSaved();
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Create failed");
+      setError(e instanceof Error ? e.message : isEdit ? "Update failed" : "Create failed");
     } finally {
       setSubmitting(false);
     }
@@ -176,7 +208,9 @@ function CreateResourceModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">New {config.title}</h2>
+          <h2 className="text-lg font-semibold text-white">
+            {isEdit ? `Edit ${config.title}` : `New ${config.title}`}
+          </h2>
           <button
             onClick={onClose}
             aria-label="Close"
@@ -191,32 +225,40 @@ function CreateResourceModal({
         )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          {config.fields.map((field) => (
-            <label key={field.key} className="flex flex-col gap-1 text-sm text-zinc-300">
-              <span>
-                {field.label}
-                {field.required && <span className="text-red-400"> *</span>}
-              </span>
-              {field.type === "lookup" && field.lookup ? (
-                <LookupCombobox
-                  lookup={field.lookup}
-                  required={field.required}
-                  value={formValues[field.key] ?? ""}
-                  onChange={(id) => setFormValues((prev) => ({ ...prev, [field.key]: id }))}
-                />
-              ) : (
-                <input
-                  type={field.type === "number" ? "number" : field.type === "datetime" ? "datetime-local" : "text"}
-                  required={field.required}
-                  value={formValues[field.key] ?? ""}
-                  onChange={(e) =>
-                    setFormValues((prev) => ({ ...prev, [field.key]: e.target.value }))
-                  }
-                  className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none"
-                />
-              )}
-            </label>
-          ))}
+          {config.fields.map((field) => {
+            const value = formValues[field.key] ?? "";
+            const initialLabel =
+              isEdit && value
+                ? lookupMaps[field.key]?.get(Number(value)) ?? value
+                : undefined;
+            return (
+              <label key={field.key} className="flex flex-col gap-1 text-sm text-zinc-300">
+                <span>
+                  {field.label}
+                  {field.required && <span className="text-red-400"> *</span>}
+                </span>
+                {field.type === "lookup" && field.lookup ? (
+                  <LookupCombobox
+                    lookup={field.lookup}
+                    required={field.required}
+                    value={value}
+                    initialLabel={initialLabel}
+                    onChange={(id) => setFormValues((prev) => ({ ...prev, [field.key]: id }))}
+                  />
+                ) : (
+                  <input
+                    type={field.type === "number" ? "number" : field.type === "datetime" ? "datetime-local" : "text"}
+                    required={field.required}
+                    value={value}
+                    onChange={(e) =>
+                      setFormValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                    }
+                    className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none"
+                  />
+                )}
+              </label>
+            );
+          })}
           <div className="mt-2 flex justify-end gap-2">
             <button
               type="button"
@@ -289,9 +331,12 @@ export default function ResourceManager({
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState(initialSearch ?? "");
   const [formOpen, setFormOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<Row | null>(null);
   const [lookupMaps, setLookupMaps] = useState<Record<string, Map<number, string>>>({});
 
   const lookupColumns = config.columns.filter((col) => col.nameLookup);
+  const isEditable = config.fields.length > 0;
+  const showActionsCol = isEditable || config.deletable !== false;
 
   async function load() {
     setLoading(true);
@@ -389,7 +434,22 @@ export default function ResourceManager({
       )}
 
       {formOpen && !config.useMemberModal && (
-        <CreateResourceModal config={config} onClose={() => setFormOpen(false)} onCreated={load} />
+        <ResourceFormModal
+          config={config}
+          lookupMaps={lookupMaps}
+          onClose={() => setFormOpen(false)}
+          onSaved={load}
+        />
+      )}
+
+      {editingRow && (
+        <ResourceFormModal
+          config={config}
+          row={editingRow}
+          lookupMaps={lookupMaps}
+          onClose={() => setEditingRow(null)}
+          onSaved={load}
+        />
       )}
 
       <div className="flex flex-col rounded border border-zinc-800">
@@ -400,7 +460,7 @@ export default function ResourceManager({
               {col.label}
             </div>
           ))}
-          {config.deletable !== false && <div className="w-20 shrink-0" />}
+          {showActionsCol && <div className="w-40 shrink-0" />}
         </div>
 
         {loading && <div className="py-12 text-center text-sm text-zinc-500">Loading…</div>}
@@ -439,14 +499,24 @@ export default function ResourceManager({
                   </div>
                 );
               })}
-              {config.deletable !== false && (
-                <div className="w-20 shrink-0 text-right">
-                  <button
-                    onClick={() => handleDelete(row.id)}
-                    className="rounded-full border border-red-500/40 px-3 py-1 text-xs font-semibold text-red-400 hover:bg-red-500/10"
-                  >
-                    Delete
-                  </button>
+              {showActionsCol && (
+                <div className="flex w-40 shrink-0 items-center justify-end gap-2">
+                  {isEditable && (
+                    <button
+                      onClick={() => setEditingRow(row)}
+                      className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-semibold text-zinc-300 transition hover:bg-zinc-700"
+                    >
+                      Edit
+                    </button>
+                  )}
+                  {config.deletable !== false && (
+                    <button
+                      onClick={() => handleDelete(row.id)}
+                      className="rounded-full border border-red-500/40 px-3 py-1 text-xs font-semibold text-red-400 hover:bg-red-500/10"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
               )}
             </div>

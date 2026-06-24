@@ -162,6 +162,23 @@ export const resourceConfigs: ResourceConfig[] = [
     deletable: false,
   },
   {
+    title: "Coaches",
+    basePath: "/api/v1/coaches",
+    columns: [
+      { key: "id", label: "ID" },
+      { key: "firstName", label: "First name" },
+      { key: "lastName", label: "Last name" },
+      { key: "email", label: "Email" },
+      { key: "phone", label: "Phone" },
+    ],
+    fields: [
+      { key: "firstName", label: "First name", type: "text", required: true },
+      { key: "lastName", label: "Last name", type: "text", required: true },
+      { key: "email", label: "Email", type: "text" },
+      { key: "phone", label: "Phone", type: "text" },
+    ],
+  },
+  {
     title: "Classes",
     basePath: "/api/v1/classes",
     columns: [
@@ -171,6 +188,15 @@ export const resourceConfigs: ResourceConfig[] = [
       { key: "startDateTime", label: "Start" },
       { key: "endDateTime", label: "End" },
       { key: "capacity", label: "Capacity" },
+      {
+        key: "coachId",
+        label: "Coach",
+        nameLookup: {
+          basePath: "/api/v1/coaches",
+          render: (row) => `${row.firstName} ${row.lastName}`,
+        },
+        linkToResource: "Coaches",
+      },
     ],
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
@@ -179,6 +205,27 @@ export const resourceConfigs: ResourceConfig[] = [
       { key: "endDateTime", label: "End", type: "datetime", required: true },
       { key: "capacity", label: "Capacity", type: "number" },
       { key: "location", label: "Location", type: "text" },
+      {
+        key: "coachId",
+        label: "Coach",
+        type: "lookup",
+        lookup: {
+          placeholder: "Search coaches by name…",
+          fetchOptions: async (query) => {
+            const filter = (field: string) =>
+              fetch(`/api/v1/coaches?q=${field}|like|'${encodeURIComponent(query)}'`).then((r) => r.json());
+            const [byFirst, byLast] = await Promise.all([filter("firstName"), filter("lastName")]);
+            const byId = new Map<number, { firstName: string; lastName: string }>();
+            for (const c of [...(byFirst.data ?? []), ...(byLast.data ?? [])]) {
+              byId.set(c.id, c);
+            }
+            return [...byId.entries()].map(([id, c]) => ({
+              id,
+              label: `${c.firstName} ${c.lastName}`,
+            }));
+          },
+        },
+      },
     ],
     deletable: false,
   },

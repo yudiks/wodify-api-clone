@@ -116,6 +116,16 @@ model Discount {
 
 // ---------- Programs & Classes ----------
 
+model Coach {
+  id          Int      @id @default(autoincrement())
+  firstName   String
+  lastName    String
+  email       String?  @unique
+  phone       String?
+  createdDate DateTime @default(now())
+  classes     Class[]
+}
+
 model Class {
   id           Int                @id @default(autoincrement())
   name         String
@@ -124,6 +134,8 @@ model Class {
   endDateTime   DateTime
   capacity     Int                @default(20)
   location     String?
+  coachId      Int?
+  coach        Coach?             @relation(fields: [coachId], references: [id])
   reservations ClassReservation[]
   signIns      ClassSignIn[]
 }

@@ -10,7 +10,7 @@ import {
   DELETE as deleteTemplate,
 } from "@/app/api/v1/membership-templates/[id]/route";
 import { GET as listMemberships, POST as createMembership } from "@/app/api/v1/memberships/route";
-import { GET as getMembership } from "@/app/api/v1/memberships/[id]/route";
+import { GET as getMembership, PUT as updateMembership } from "@/app/api/v1/memberships/[id]/route";
 import { PUT as deactivateMembership } from "@/app/api/v1/memberships/[id]/deactivate/route";
 import { ctx, makeRequest } from "./helpers";
 
@@ -79,5 +79,41 @@ describe("Memberships API", () => {
   it("rejects a membership without clientId/templateId", async () => {
     const res = await createMembership(makeRequest("/api/v1/memberships", { method: "POST", body: {} }));
     expect(res.status).toBe(400);
+  });
+
+  it("updates a membership's clientId and templateId", async () => {
+    const client = await setupClient();
+    const otherClient = await createClient(
+      makeRequest("/api/v1/clients", { method: "POST", body: { firstName: "Other", lastName: "Client" } })
+    ).then((r) => r.json());
+    const template = await createTemplate(
+      makeRequest("/api/v1/membership-templates", { method: "POST", body: { name: "Drop-in", price: 20 } })
+    ).then((r) => r.json());
+    const otherTemplate = await createTemplate(
+      makeRequest("/api/v1/membership-templates", { method: "POST", body: { name: "Unlimited", price: 99 } })
+    ).then((r) => r.json());
+
+    const membership = await createMembership(
+      makeRequest("/api/v1/memberships", {
+        method: "POST",
+        body: { clientId: client.id, templateId: template.id },
+      })
+    ).then((r) => r.json());
+
+    const updated = await updateMembership(
+      makeRequest(`/api/v1/memberships/${membership.id}`, {
+        method: "PUT",
+        body: { clientId: otherClient.id, templateId: otherTemplate.id },
+      }),
+      ctx(membership.id)
+    ).then((r) => r.json());
+    expect(updated.clientId).toBe(otherClient.id);
+    expect(updated.templateId).toBe(otherTemplate.id);
+
+    const got = await getMembership(makeRequest(`/api/v1/memberships/${membership.id}`), ctx(membership.id)).then(
+      (r) => r.json()
+    );
+    expect(got.clientId).toBe(otherClient.id);
+    expect(got.templateId).toBe(otherTemplate.id);
   });
 });

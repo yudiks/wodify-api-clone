@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { POST as createClient } from "@/app/api/v1/clients/route";
+import { POST as createCoach } from "@/app/api/v1/coaches/route";
 import { GET as listClasses, POST as createClass } from "@/app/api/v1/classes/route";
-import { GET as getClass } from "@/app/api/v1/classes/[id]/route";
+import { GET as getClass, PUT as updateClass } from "@/app/api/v1/classes/[id]/route";
 import { POST as createReservation } from "@/app/api/v1/classes/[id]/reservations/route";
 import { POST as createSignIn } from "@/app/api/v1/classes/[id]/sign-ins/route";
 import { GET as listReservations } from "@/app/api/v1/reservations/route";
@@ -83,6 +84,41 @@ describe("Classes API", () => {
 
     const list = await listSignIns(makeRequest("/api/v1/sign-ins")).then((r) => r.json());
     expect(list.total).toBe(1);
+  });
+
+  it("edits a class's fields, including assigning and clearing a coach", async () => {
+    const { klass } = await setupClassAndClient();
+
+    const coach = await createCoach(
+      makeRequest("/api/v1/coaches", { method: "POST", body: { firstName: "Cori", lastName: "Coach" } })
+    ).then((r) => r.json());
+
+    const assigned = await updateClass(
+      makeRequest(`/api/v1/classes/${klass.id}`, {
+        method: "PUT",
+        body: { name: "WOD (updated)", capacity: 30, coachId: coach.id },
+      }),
+      ctx(klass.id)
+    ).then((r) => r.json());
+    expect(assigned.name).toBe("WOD (updated)");
+    expect(assigned.capacity).toBe(30);
+    expect(assigned.coachId).toBe(coach.id);
+    // Fields not present in the PUT body must be left unchanged.
+    expect(new Date(assigned.startDateTime)).toBeInstanceOf(Date);
+
+    const cleared = await updateClass(
+      makeRequest(`/api/v1/classes/${klass.id}`, { method: "PUT", body: { coachId: null } }),
+      ctx(klass.id)
+    ).then((r) => r.json());
+    expect(cleared.coachId).toBeNull();
+  });
+
+  it("404s when editing a missing class", async () => {
+    const res = await updateClass(
+      makeRequest("/api/v1/classes/999999", { method: "PUT", body: { name: "Nope" } }),
+      ctx(999999)
+    );
+    expect(res.status).toBe(404);
   });
 
   it("404s when reserving into a missing class", async () => {

@@ -14,5 +14,6 @@ export const POST = createHandler(prisma.class, "Class", (body) => {
     endDateTime: new Date(String(body.endDateTime)),
     capacity: body.capacity !== undefined ? Number(body.capacity) : undefined,
     location: body.location ? String(body.location) : undefined,
+    coachId: body.coachId ? Number(body.coachId) : undefined,
   };
 });
