@@ -143,14 +143,12 @@ export default function ClassDetail({ classId }: { classId: string }) {
           </div>
         )}
 
-        {data.coach && (
-          <div className="mt-2 flex items-center gap-2 text-sm text-zinc-400">
-            <span aria-hidden>🧑‍🏫</span>
-            <span>
-              Coach: {data.coach.firstName} {data.coach.lastName}
-            </span>
-          </div>
-        )}
+        <div className="mt-2 flex items-center gap-2 text-sm text-zinc-400">
+          <span aria-hidden>🧑‍🏫</span>
+          <span>
+            {data.coach ? `Coach: ${data.coach.firstName} ${data.coach.lastName}` : "Coach is currently unassigned"}
+          </span>
+        </div>
 
         <Link
           href={`/portal?tab=workout&date=${encodeURIComponent(start.toISOString())}`}
