@@ -66,8 +66,46 @@ export const resourceConfigs: ResourceConfig[] = [
       { key: "autoRenew", label: "Auto-renew" },
     ],
     fields: [
-      { key: "clientId", label: "Client ID", type: "number", required: true },
-      { key: "templateId", label: "Template ID", type: "number", required: true },
+      {
+        key: "clientId",
+        label: "Client",
+        type: "lookup",
+        required: true,
+        lookup: {
+          placeholder: "Search clients by name…",
+          fetchOptions: async (query) => {
+            const filter = (field: string) =>
+              fetch(`/api/v1/clients?q=${field}|like|'${encodeURIComponent(query)}'`).then((r) => r.json());
+            const [byFirst, byLast] = await Promise.all([filter("firstName"), filter("lastName")]);
+            const byId = new Map<number, { firstName: string; lastName: string }>();
+            for (const c of [...(byFirst.data ?? []), ...(byLast.data ?? [])]) {
+              byId.set(c.id, c);
+            }
+            return [...byId.entries()].map(([id, c]) => ({
+              id,
+              label: `${c.firstName} ${c.lastName}`,
+            }));
+          },
+        },
+      },
+      {
+        key: "templateId",
+        label: "Membership template",
+        type: "lookup",
+        required: true,
+        lookup: {
+          placeholder: "Search membership templates…",
+          fetchOptions: async (query) => {
+            const res = await fetch(
+              `/api/v1/membership-templates?q=name|like|'${encodeURIComponent(query)}'`
+            ).then((r) => r.json());
+            return (res.data ?? []).map((t: { id: number; name: string; price: number | null }) => ({
+              id: t.id,
+              label: t.price != null ? `${t.name} ($${t.price})` : t.name,
+            }));
+          },
+        },
+      },
     ],
     deletable: false,
   },

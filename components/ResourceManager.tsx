@@ -1,15 +1,138 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AddMemberModal from "@/components/AddMemberModal";
 
-export type FieldType = "text" | "number" | "datetime" | "checkbox";
+export type FieldType = "text" | "number" | "datetime" | "checkbox" | "lookup";
+
+export interface LookupOption {
+  id: number;
+  label: string;
+}
 
 export interface FieldConfig {
   key: string;
   label: string;
   type: FieldType;
   required?: boolean;
+  /** Required when type === "lookup": resolves a search string to matching options. */
+  lookup?: {
+    fetchOptions: (query: string) => Promise<LookupOption[]>;
+    placeholder?: string;
+  };
+}
+
+function LookupCombobox({
+  lookup,
+  value,
+  onChange,
+  required,
+}: {
+  lookup: NonNullable<FieldConfig["lookup"]>;
+  value: string;
+  onChange: (id: string) => void;
+  required?: boolean;
+}) {
+  const [query, setQuery] = useState("");
+  const [options, setOptions] = useState<LookupOption[]>([]);
+  const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState<LookupOption | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (selected) return;
+    if (!query.trim()) {
+      setOptions([]);
+      setOpen(false);
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const results = await lookup.fetchOptions(query.trim());
+        setOptions(results);
+        setOpen(true);
+      } catch {
+        // ignore lookup errors, not critical to the form
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, selected]);
+
+  // If the form was reset externally (e.g. after a successful save), clear local state too.
+  useEffect(() => {
+    if (value === "" && selected) {
+      setSelected(null);
+      setQuery("");
+    }
+  }, [value, selected]);
+
+  function handleSelect(opt: LookupOption) {
+    setSelected(opt);
+    setQuery(opt.label);
+    setOpen(false);
+    onChange(String(opt.id));
+  }
+
+  function handleClear() {
+    setSelected(null);
+    setQuery("");
+    setOptions([]);
+    setOpen(false);
+    onChange("");
+  }
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        required={required && !value}
+        value={query}
+        disabled={!!selected}
+        onChange={(e) => setQuery(e.target.value)}
+        onFocus={() => {
+          if (options.length > 0 && !selected) setOpen(true);
+        }}
+        placeholder={lookup.placeholder ?? "Search…"}
+        className="w-full rounded border border-zinc-700 bg-zinc-800 px-2 py-1.5 pr-14 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none disabled:opacity-70"
+      />
+      {selected && (
+        <button
+          type="button"
+          onClick={handleClear}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-zinc-200"
+        >
+          Clear
+        </button>
+      )}
+      {open && !selected && (
+        <div className="absolute top-full z-10 mt-1 w-full overflow-hidden rounded border border-zinc-700 bg-zinc-800 shadow-lg">
+          {searching && <div className="px-3 py-2 text-sm text-zinc-500">Searching…</div>}
+          {!searching && options.length === 0 && (
+            <div className="px-3 py-2 text-sm text-zinc-500">No matches</div>
+          )}
+          {!searching &&
+            options.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => handleSelect(opt)}
+                className="flex w-full items-center px-3 py-2 text-left text-sm text-zinc-100 hover:bg-zinc-700"
+              >
+                {opt.label}
+              </button>
+            ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export interface ResourceConfig {
@@ -149,15 +272,24 @@ export default function ResourceManager({ config }: { config: ResourceConfig }) 
                 {field.label}
                 {field.required && <span className="text-red-400"> *</span>}
               </span>
-              <input
-                type={field.type === "number" ? "number" : field.type === "datetime" ? "datetime-local" : "text"}
-                required={field.required}
-                value={formValues[field.key] ?? ""}
-                onChange={(e) =>
-                  setFormValues((prev) => ({ ...prev, [field.key]: e.target.value }))
-                }
-                className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none"
-              />
+              {field.type === "lookup" && field.lookup ? (
+                <LookupCombobox
+                  lookup={field.lookup}
+                  required={field.required}
+                  value={formValues[field.key] ?? ""}
+                  onChange={(id) => setFormValues((prev) => ({ ...prev, [field.key]: id }))}
+                />
+              ) : (
+                <input
+                  type={field.type === "number" ? "number" : field.type === "datetime" ? "datetime-local" : "text"}
+                  required={field.required}
+                  value={formValues[field.key] ?? ""}
+                  onChange={(e) =>
+                    setFormValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                  }
+                  className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none"
+                />
+              )}
             </label>
           ))}
           <div className="col-span-full">
