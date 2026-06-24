@@ -14,6 +14,7 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
   const klass = await prisma.class.findUnique({
     where: { id },
     include: {
+      coach: { select: { id: true, firstName: true, lastName: true } },
       reservations: {
         where: { status: { in: ["Reserved", "Waitlisted"] } },
         orderBy: { createdDate: "asc" },

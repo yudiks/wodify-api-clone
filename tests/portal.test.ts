@@ -6,6 +6,7 @@ import { POST as reserve } from "@/app/api/v1/portal/classes/[id]/reserve/route"
 import { GET as myReservations } from "@/app/api/v1/portal/reservations/route";
 import { PUT as cancelReservation } from "@/app/api/v1/portal/reservations/[id]/cancel/route";
 import { POST as createClass } from "@/app/api/v1/classes/route";
+import { POST as createCoach } from "@/app/api/v1/coaches/route";
 import { ctx, makeRequest, sessionCookieFrom } from "./helpers";
 
 async function signupAndGetCookie(email: string) {
@@ -159,5 +160,37 @@ describe("Portal class detail", () => {
     const bodyB = await asB.json();
     expect(bodyB.attendees).toHaveLength(1);
     expect(bodyB.myReservation).toBeNull();
+  });
+
+  it("includes the assigned coach's name, or null when unassigned", async () => {
+    const noCoachClass = await makeClass();
+    const { cookie } = await signupAndGetCookie("detailcoach@test.com");
+    const noCoachRes = await getPortalClass(
+      makeRequest(`/api/v1/portal/classes/${noCoachClass.id}`, { cookie }),
+      ctx(noCoachClass.id)
+    ).then((r) => r.json());
+    expect(noCoachRes.coach).toBeNull();
+
+    const coach = await createCoach(
+      makeRequest("/api/v1/coaches", { method: "POST", body: { firstName: "Cori", lastName: "Coach" } })
+    ).then((r) => r.json());
+    const coachedClassRaw = await createClass(
+      makeRequest("/api/v1/classes", {
+        method: "POST",
+        body: {
+          name: "WOD",
+          startDateTime: new Date(Date.now() + 3600_000).toISOString(),
+          endDateTime: new Date(Date.now() + 7200_000).toISOString(),
+          capacity: 1,
+          coachId: coach.id,
+        },
+      })
+    ).then((r) => r.json());
+
+    const coachedRes = await getPortalClass(
+      makeRequest(`/api/v1/portal/classes/${coachedClassRaw.id}`, { cookie }),
+      ctx(coachedClassRaw.id)
+    ).then((r) => r.json());
+    expect(coachedRes.coach).toEqual({ id: coach.id, firstName: "Cori", lastName: "Coach" });
   });
 });

@@ -25,6 +25,7 @@ interface ClassDetailData {
   endDateTime: string;
   capacity: number;
   location: string | null;
+  coach: { id: number; firstName: string; lastName: string } | null;
   spotsRemaining: number;
   attendees: Attendee[];
   myReservation: { id: number; status: string } | null;
@@ -139,6 +140,15 @@ export default function ClassDetail({ classId }: { classId: string }) {
           <div className="mt-2 flex items-center gap-2 text-sm text-zinc-400">
             <span aria-hidden>📍</span>
             <span>{data.location}</span>
+          </div>
+        )}
+
+        {data.coach && (
+          <div className="mt-2 flex items-center gap-2 text-sm text-zinc-400">
+            <span aria-hidden>🧑‍🏫</span>
+            <span>
+              Coach: {data.coach.firstName} {data.coach.lastName}
+            </span>
           </div>
         )}
 
