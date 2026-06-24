@@ -142,6 +142,13 @@ export default function ClassDetail({ classId }: { classId: string }) {
           </div>
         )}
 
+        <Link
+          href={`/portal?tab=workout&date=${encodeURIComponent(start.toISOString())}`}
+          className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-teal-400 hover:underline"
+        >
+          Go to workout <span aria-hidden>↗</span>
+        </Link>
+
         {actionError && <p className="mt-4 rounded bg-red-950 px-3 py-2 text-sm text-red-300">{actionError}</p>}
 
         <div className="mt-6 border-t border-zinc-800" />

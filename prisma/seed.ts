@@ -116,6 +116,50 @@ async function main() {
     },
   });
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  await prisma.workout.create({
+    data: {
+      name: "Functional Fitness",
+      program: "Functional Fitness",
+      scheduledDate: today,
+      sections: {
+        create: [
+          {
+            title: "General Warm Up",
+            notes: "Two sets of:",
+            position: 0,
+            exercises: {
+              create: [
+                { name: "Banded Good Mornings", prescription: "15", position: 0 },
+                { name: "Single Leg Hip Bridges", prescription: "10 (each leg)", position: 1 },
+                { name: "Banded Pallof Hold", prescription: "30 Second (each side)", position: 2 },
+                { name: "Banded Pull Throughs", prescription: "15", position: 3 },
+                { name: "Suitcase Carry", prescription: "50 Foot (each side)", position: 4 },
+                { name: "Russian Kettlebell Swings", prescription: "10", position: 5 },
+              ],
+            },
+          },
+          {
+            title: "Strength (Part A)",
+            position: 1,
+            exercises: {
+              create: [
+                {
+                  name: "Clean",
+                  prescription:
+                    "Every 2 minutes, for 16 minutes (8 sets of):\nSets 1-3: Clean x 1.1 @ 65-75%\nSets 4-6: Clean x 1 @ 75-80%\nSets 7-8: Clean x 1 @ 80-85%",
+                  position: 0,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  });
+
   console.log("Seed complete.");
   console.log(`Member Portal login: ${client.email} / ${MEMBER_PORTAL_PASSWORD}`);
 }

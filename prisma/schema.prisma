@@ -51,10 +51,11 @@ model Client {
   createdDate  DateTime      @default(now())
   modifiedDate DateTime      @updatedAt
 
-  memberships  Membership[]
-  invoices     Invoice[]
-  reservations ClassReservation[]
-  signIns      ClassSignIn[]
+  memberships    Membership[]
+  invoices       Invoice[]
+  reservations   ClassReservation[]
+  signIns        ClassSignIn[]
+  workoutResults WorkoutResult[]
 }
 
 // ---------- Memberships ----------
@@ -149,11 +150,48 @@ model ClassSignIn {
 // ---------- Workouts ----------
 
 model Workout {
-  id          Int      @id @default(autoincrement())
-  name        String
-  description String?
-  type        String?
-  components  String?
-  createdDate DateTime @default(now())
-  modifiedDate DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  name          String
+  description   String?
+  type          String?
+  components    String?
+  program       String?
+  scheduledDate DateTime?
+  createdDate   DateTime @default(now())
+  modifiedDate  DateTime @updatedAt
+
+  sections WorkoutSection[]
+}
+
+model WorkoutSection {
+  id        Int     @id @default(autoincrement())
+  workoutId Int
+  workout   Workout @relation(fields: [workoutId], references: [id])
+  title     String
+  notes     String?
+  position  Int     @default(0)
+
+  exercises WorkoutExercise[]
+}
+
+model WorkoutExercise {
+  id           Int            @id @default(autoincrement())
+  sectionId    Int
+  section      WorkoutSection @relation(fields: [sectionId], references: [id])
+  name         String
+  prescription String?
+  videoUrl     String?
+  position     Int            @default(0)
+
+  results WorkoutResult[]
+}
+
+model WorkoutResult {
+  id          Int             @id @default(autoincrement())
+  exerciseId  Int
+  exercise    WorkoutExercise @relation(fields: [exerciseId], references: [id])
+  clientId    Int
+  client      Client          @relation(fields: [clientId], references: [id])
+  notes       String
+  performedAt DateTime        @default(now())
 }

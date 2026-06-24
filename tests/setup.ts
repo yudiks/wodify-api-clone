@@ -8,7 +8,11 @@ beforeEach(async () => {
   try {
     await prisma.classSignIn.deleteMany();
     await prisma.classReservation.deleteMany();
+    await prisma.workoutResult.deleteMany();
+    await prisma.workoutExercise.deleteMany();
     await prisma.class.deleteMany();
+    await prisma.workoutSection.deleteMany();
+    await prisma.workout.deleteMany();
     await prisma.transaction.deleteMany();
     await prisma.invoice.deleteMany();
     await prisma.membership.deleteMany();
@@ -18,7 +22,6 @@ beforeEach(async () => {
     await prisma.clientStatus.deleteMany();
     await prisma.lead.deleteMany();
     await prisma.leadStatus.deleteMany();
-    await prisma.workout.deleteMany();
   } catch (err) {
     console.warn("beforeEach: database unavailable, skipping cleanup", err);
   }

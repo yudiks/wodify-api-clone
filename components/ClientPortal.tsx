@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import WorkoutView from "@/components/WorkoutView";
 import {
   addDays,
   avatarColor,
@@ -39,7 +41,7 @@ interface ReservationRow {
   class: ClassRow;
 }
 
-type Tab = "classes" | "reservations";
+type Tab = "classes" | "reservations" | "workout";
 
 export default function ClientPortal() {
   const [client, setClient] = useState<Client | null | undefined>(undefined); // undefined = loading
@@ -48,7 +50,17 @@ export default function ClientPortal() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [authSubmitting, setAuthSubmitting] = useState(false);
 
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>("classes");
+  const [workoutInitialDate, setWorkoutInitialDate] = useState<Date | undefined>(undefined);
+
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t === "workout" || t === "reservations" || t === "classes") setTab(t);
+    const d = searchParams.get("date");
+    setWorkoutInitialDate(d ? new Date(d) : undefined);
+  }, [searchParams]);
+
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selectedDay, setSelectedDay] = useState(() => {
     const d = new Date();
@@ -287,6 +299,14 @@ export default function ClientPortal() {
         >
           My Reservations
         </button>
+        <button
+          onClick={() => setTab("workout")}
+          className={`border-b-2 px-1 py-3 text-sm font-medium transition ${
+            tab === "workout" ? "border-teal-400 text-teal-400" : "border-transparent text-zinc-500"
+          }`}
+        >
+          Workout
+        </button>
       </nav>
 
       {actionError && (
@@ -443,6 +463,8 @@ export default function ClientPortal() {
           })}
         </div>
       )}
+
+      {tab === "workout" && <WorkoutView initialDate={workoutInitialDate} />}
     </div>
   );
 }
