@@ -41,7 +41,8 @@ model Client {
   id           Int           @id @default(autoincrement())
   firstName    String
   lastName     String
-  email        String?
+  email        String?       @unique
+  passwordHash String?
   phone        String?
   statusId     Int?
   status       ClientStatus? @relation(fields: [statusId], references: [id])

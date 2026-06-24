@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import ResourceManager from "@/components/ResourceManager";
 import { resourceConfigs } from "@/lib/resource-configs";
 
@@ -10,11 +11,16 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      <header>
-        <h1 className="text-2xl font-bold">Wodify Clone Admin</h1>
-        <p className="text-sm text-zinc-500">
-          A self-contained clone of the Wodify API — browse and manage resources below.
-        </p>
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Wodify Clone Admin</h1>
+          <p className="text-sm text-zinc-500">
+            A self-contained clone of the Wodify API — browse and manage resources below.
+          </p>
+        </div>
+        <Link href="/portal" className="text-sm text-blue-600 hover:underline">
+          Member Portal →
+        </Link>
       </header>
 
       <nav className="flex flex-wrap gap-2 border-b border-zinc-200 pb-2 dark:border-zinc-800">
