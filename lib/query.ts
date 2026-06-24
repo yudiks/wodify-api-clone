@@ -21,6 +21,7 @@ function coerceValue(raw: string): unknown {
 
 function coerceList(raw: string): unknown[] {
   const inner = raw.trim().replace(/^\{/, "").replace(/\}$/, "");
+  if (inner === "") return [];
   return inner.split(",").map((v) => coerceValue(v));
 }
 

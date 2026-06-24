@@ -38,23 +38,16 @@ describe("id|in query syntax (lookup feature dependency)", () => {
     expect(body.total).toBe(0);
   });
 
-  // KNOWN BUG: an empty id set serialized as `{}` causes coerceList to split("")
-  // into [""], which Prisma rejects for an Int column, producing a 500.
-  // The ResourceManager UI never triggers this directly (resolveLookups skips
-  // the fetch when there are 0 ids to resolve), but the underlying query-syntax
-  // helper is broken for this input if called directly or reused elsewhere.
-  it("documents that id|in|{} (empty list) currently throws instead of returning an empty result", async () => {
-    // coerceList("{}") strips the braces leaving "", and "".split(",") yields
-    // [""] (one empty-string element) rather than []. Prisma then rejects
-    // `in: [""]` against an Int column with a PrismaClientValidationError,
-    // which is uncaught by listHandler and propagates as a thrown/rejected
-    // promise (surfaced as an HTTP 500 by Next.js's route error boundary when
-    // hit over real HTTP — confirmed via curl against the dev server).
-    //
-    // If/when lib/query.ts's coerceList is fixed to treat "" as [] (no items),
-    // change this test to assert a 200 response with an empty data array.
-    await expect(
-      listClients(makeRequest(`/api/v1/clients?q=${encodeURIComponent("id|in|{}")}`))
-    ).rejects.toThrow();
+  it("returns an empty array (not an error) when the id set itself is empty", async () => {
+    // coerceList("{}") strips the braces leaving "", which must map to []
+    // (no items) rather than [""] (one empty-string element, which Prisma
+    // rejects for an Int column with a PrismaClientValidationError).
+    const res = await listClients(
+      makeRequest(`/api/v1/clients?q=${encodeURIComponent("id|in|{}")}`)
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data).toEqual([]);
+    expect(body.total).toBe(0);
   });
 });
