@@ -135,10 +135,22 @@ function LookupCombobox({
   );
 }
 
+export interface ColumnConfig {
+  key: string;
+  label: string;
+  /** Resolves this column's raw id into a human-readable name via a related resource. */
+  nameLookup?: {
+    basePath: string;
+    render: (row: Row) => string;
+  };
+  /** Resource title (matching a ResourceConfig.title) this column's id should link to. */
+  linkToResource?: string;
+}
+
 export interface ResourceConfig {
   title: string;
   basePath: string;
-  columns: { key: string; label: string }[];
+  columns: ColumnConfig[];
   fields: FieldConfig[];
   creatable?: boolean;
   deletable?: boolean;
@@ -159,14 +171,25 @@ function formatCell(value: unknown): string {
   return String(value);
 }
 
-export default function ResourceManager({ config }: { config: ResourceConfig }) {
+export default function ResourceManager({
+  config,
+  initialSearch,
+  onNavigate,
+}: {
+  config: ResourceConfig;
+  initialSearch?: string;
+  onNavigate?: (resourceTitle: string, idFilter: number) => void;
+}) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch ?? "");
   const [formOpen, setFormOpen] = useState(false);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [lookupMaps, setLookupMaps] = useState<Record<string, Map<number, string>>>({});
+
+  const lookupColumns = config.columns.filter((col) => col.nameLookup);
 
   async function load() {
     setLoading(true);
@@ -178,12 +201,36 @@ export default function ResourceManager({ config }: { config: ResourceConfig }) 
       const res = await fetch(url);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Request failed");
-      setRows(json.data ?? []);
+      const data: Row[] = json.data ?? [];
+      setRows(data);
+      await resolveLookups(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function resolveLookups(data: Row[]) {
+    if (lookupColumns.length === 0) return;
+    const maps = await Promise.all(
+      lookupColumns.map(async (col) => {
+        const ids = [...new Set(data.map((row) => row[col.key]).filter((v): v is number => typeof v === "number"))];
+        const map = new Map<number, string>();
+        if (ids.length === 0) return [col.key, map] as const;
+        const res = await fetch(
+          `${col.nameLookup!.basePath}?q=id|in|{${ids.join(",")}}&pageSize=200`
+        );
+        const json = await res.json();
+        if (res.ok) {
+          for (const related of json.data ?? []) {
+            map.set(related.id, col.nameLookup!.render(related));
+          }
+        }
+        return [col.key, map] as const;
+      })
+    );
+    setLookupMaps(Object.fromEntries(maps));
   }
 
   useEffect(() => {
@@ -324,11 +371,28 @@ export default function ResourceManager({ config }: { config: ResourceConfig }) 
         {!loading &&
           rows.map((row) => (
             <div key={String(row.id)} className="flex items-center border-b border-zinc-800 px-4 py-3">
-              {config.columns.map((col) => (
-                <div key={col.key} className="min-w-0 flex-1 truncate text-sm text-zinc-100">
-                  {formatCell(row[col.key])}
-                </div>
-              ))}
+              {config.columns.map((col) => {
+                const rawValue = row[col.key];
+                const label = col.nameLookup
+                  ? lookupMaps[col.key]?.get(rawValue as number) ?? formatCell(rawValue)
+                  : formatCell(rawValue);
+                const canLink = col.linkToResource && onNavigate && typeof rawValue === "number";
+                return (
+                  <div key={col.key} className="min-w-0 flex-1 truncate text-sm text-zinc-100">
+                    {canLink ? (
+                      <button
+                        type="button"
+                        onClick={() => onNavigate!(col.linkToResource!, rawValue as number)}
+                        className="truncate text-teal-400 hover:underline"
+                      >
+                        {label}
+                      </button>
+                    ) : (
+                      label
+                    )}
+                  </div>
+                );
+              })}
               {config.deletable !== false && (
                 <div className="w-20 shrink-0 text-right">
                   <button

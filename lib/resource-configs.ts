@@ -60,8 +60,24 @@ export const resourceConfigs: ResourceConfig[] = [
     basePath: "/api/v1/memberships",
     columns: [
       { key: "id", label: "ID" },
-      { key: "clientId", label: "Client ID" },
-      { key: "templateId", label: "Template ID" },
+      {
+        key: "clientId",
+        label: "Client",
+        nameLookup: {
+          basePath: "/api/v1/clients",
+          render: (row) => `${row.firstName} ${row.lastName}`,
+        },
+        linkToResource: "Clients",
+      },
+      {
+        key: "templateId",
+        label: "Membership template",
+        nameLookup: {
+          basePath: "/api/v1/membership-templates",
+          render: (row) => String(row.name),
+        },
+        linkToResource: "Membership Templates",
+      },
       { key: "isActive", label: "Active" },
       { key: "autoRenew", label: "Auto-renew" },
     ],

@@ -7,7 +7,15 @@ import { resourceConfigs } from "@/lib/resource-configs";
 
 export default function Dashboard() {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [pendingSearch, setPendingSearch] = useState<string | undefined>(undefined);
   const active = resourceConfigs[activeIndex];
+
+  function handleNavigate(resourceTitle: string, idFilter: number) {
+    const index = resourceConfigs.findIndex((cfg) => cfg.title === resourceTitle);
+    if (index === -1) return;
+    setActiveIndex(index);
+    setPendingSearch(`id|eq|${idFilter}`);
+  }
 
   return (
     <div className="flex min-h-screen flex-1 flex-col bg-zinc-950 text-zinc-100">
@@ -27,7 +35,10 @@ export default function Dashboard() {
         {resourceConfigs.map((cfg, i) => (
           <button
             key={cfg.title}
-            onClick={() => setActiveIndex(i)}
+            onClick={() => {
+              setActiveIndex(i);
+              setPendingSearch(undefined);
+            }}
             className={`shrink-0 border-b-2 px-1 py-3 text-sm font-medium transition ${
               i === activeIndex ? "border-teal-400 text-teal-400" : "border-transparent text-zinc-500"
             }`}
@@ -38,7 +49,12 @@ export default function Dashboard() {
       </nav>
 
       <div className="flex flex-1 flex-col gap-6 p-6">
-        <ResourceManager key={active.basePath} config={active} />
+        <ResourceManager
+          key={`${active.basePath}:${pendingSearch ?? ""}`}
+          config={active}
+          initialSearch={pendingSearch}
+          onNavigate={handleNavigate}
+        />
       </div>
     </div>
   );
