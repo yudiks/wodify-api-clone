@@ -130,7 +130,15 @@ export const resourceConfigs: ResourceConfig[] = [
     basePath: "/api/v1/invoices",
     columns: [
       { key: "id", label: "ID" },
-      { key: "clientId", label: "Client ID" },
+      {
+        key: "clientId",
+        label: "Client",
+        nameLookup: {
+          basePath: "/api/v1/clients",
+          render: (row) => `${row.firstName} ${row.lastName}`,
+        },
+        linkToResource: "Clients",
+      },
       { key: "amount", label: "Amount" },
       { key: "status", label: "Status" },
       { key: "issueDate", label: "Issued" },
@@ -179,8 +187,24 @@ export const resourceConfigs: ResourceConfig[] = [
     basePath: "/api/v1/reservations",
     columns: [
       { key: "id", label: "ID" },
-      { key: "classId", label: "Class ID" },
-      { key: "clientId", label: "Client ID" },
+      {
+        key: "classId",
+        label: "Class",
+        nameLookup: {
+          basePath: "/api/v1/classes",
+          render: (row) => String(row.name),
+        },
+        linkToResource: "Classes",
+      },
+      {
+        key: "clientId",
+        label: "Client",
+        nameLookup: {
+          basePath: "/api/v1/clients",
+          render: (row) => `${row.firstName} ${row.lastName}`,
+        },
+        linkToResource: "Clients",
+      },
       { key: "status", label: "Status" },
     ],
     fields: [],
@@ -192,8 +216,24 @@ export const resourceConfigs: ResourceConfig[] = [
     basePath: "/api/v1/sign-ins",
     columns: [
       { key: "id", label: "ID" },
-      { key: "classId", label: "Class ID" },
-      { key: "clientId", label: "Client ID" },
+      {
+        key: "classId",
+        label: "Class",
+        nameLookup: {
+          basePath: "/api/v1/classes",
+          render: (row) => String(row.name),
+        },
+        linkToResource: "Classes",
+      },
+      {
+        key: "clientId",
+        label: "Client",
+        nameLookup: {
+          basePath: "/api/v1/clients",
+          render: (row) => `${row.firstName} ${row.lastName}`,
+        },
+        linkToResource: "Clients",
+      },
       { key: "signedInAt", label: "Signed in" },
     ],
     fields: [],

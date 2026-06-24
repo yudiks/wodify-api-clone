@@ -378,7 +378,12 @@ export default function ResourceManager({
                   : formatCell(rawValue);
                 const canLink = col.linkToResource && onNavigate && typeof rawValue === "number";
                 return (
-                  <div key={col.key} className="min-w-0 flex-1 truncate text-sm text-zinc-100">
+                  <div
+                    key={col.key}
+                    className={`min-w-0 flex-1 truncate text-sm ${
+                      col.key === "id" ? "text-zinc-500" : "text-zinc-100"
+                    }`}
+                  >
                     {canLink ? (
                       <button
                         type="button"
