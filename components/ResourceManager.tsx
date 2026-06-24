@@ -135,6 +135,110 @@ function LookupCombobox({
   );
 }
 
+function CreateResourceModal({
+  config,
+  onClose,
+  onCreated,
+}: {
+  config: ResourceConfig;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(config.basePath, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formValues),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Create failed");
+      onCreated();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Create failed");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div
+        className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">New {config.title}</h2>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="text-zinc-500 transition hover:text-zinc-200"
+          >
+            ×
+          </button>
+        </div>
+
+        {error && (
+          <p className="mb-3 rounded bg-red-950 px-3 py-2 text-sm text-red-300">{error}</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          {config.fields.map((field) => (
+            <label key={field.key} className="flex flex-col gap-1 text-sm text-zinc-300">
+              <span>
+                {field.label}
+                {field.required && <span className="text-red-400"> *</span>}
+              </span>
+              {field.type === "lookup" && field.lookup ? (
+                <LookupCombobox
+                  lookup={field.lookup}
+                  required={field.required}
+                  value={formValues[field.key] ?? ""}
+                  onChange={(id) => setFormValues((prev) => ({ ...prev, [field.key]: id }))}
+                />
+              ) : (
+                <input
+                  type={field.type === "number" ? "number" : field.type === "datetime" ? "datetime-local" : "text"}
+                  required={field.required}
+                  value={formValues[field.key] ?? ""}
+                  onChange={(e) =>
+                    setFormValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                  }
+                  className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none"
+                />
+              )}
+            </label>
+          ))}
+          <div className="mt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full bg-zinc-800 px-3 py-1.5 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-700"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="rounded-full bg-teal-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 transition hover:bg-teal-400 disabled:opacity-50"
+            >
+              {submitting ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export interface ColumnConfig {
   key: string;
   label: string;
@@ -185,8 +289,6 @@ export default function ResourceManager({
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState(initialSearch ?? "");
   const [formOpen, setFormOpen] = useState(false);
-  const [formValues, setFormValues] = useState<Record<string, string>>({});
-  const [submitting, setSubmitting] = useState(false);
   const [lookupMaps, setLookupMaps] = useState<Record<string, Map<number, string>>>({});
 
   const lookupColumns = config.columns.filter((col) => col.nameLookup);
@@ -238,28 +340,6 @@ export default function ResourceManager({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.basePath]);
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    try {
-      const res = await fetch(config.basePath, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formValues),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Create failed");
-      setFormValues({});
-      setFormOpen(false);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Create failed");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   async function handleDelete(id: unknown) {
     if (!confirm(`Delete ${config.title} #${id}?`)) return;
     setError(null);
@@ -293,10 +373,10 @@ export default function ResourceManager({
           </button>
           {config.creatable !== false && (
             <button
-              onClick={() => setFormOpen((v) => !v)}
+              onClick={() => setFormOpen(true)}
               className="rounded-full bg-teal-500 px-3 py-1 text-xs font-semibold text-zinc-950 transition hover:bg-teal-400"
             >
-              {config.useMemberModal ? "Add Member" : formOpen ? "Cancel" : "New"}
+              {config.useMemberModal ? "Add Member" : "New"}
             </button>
           )}
         </div>
@@ -309,46 +389,7 @@ export default function ResourceManager({
       )}
 
       {formOpen && !config.useMemberModal && (
-        <form
-          onSubmit={handleCreate}
-          className="grid grid-cols-2 gap-3 rounded border border-zinc-800 p-3 sm:grid-cols-3"
-        >
-          {config.fields.map((field) => (
-            <label key={field.key} className="flex flex-col gap-1 text-sm text-zinc-300">
-              <span>
-                {field.label}
-                {field.required && <span className="text-red-400"> *</span>}
-              </span>
-              {field.type === "lookup" && field.lookup ? (
-                <LookupCombobox
-                  lookup={field.lookup}
-                  required={field.required}
-                  value={formValues[field.key] ?? ""}
-                  onChange={(id) => setFormValues((prev) => ({ ...prev, [field.key]: id }))}
-                />
-              ) : (
-                <input
-                  type={field.type === "number" ? "number" : field.type === "datetime" ? "datetime-local" : "text"}
-                  required={field.required}
-                  value={formValues[field.key] ?? ""}
-                  onChange={(e) =>
-                    setFormValues((prev) => ({ ...prev, [field.key]: e.target.value }))
-                  }
-                  className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none"
-                />
-              )}
-            </label>
-          ))}
-          <div className="col-span-full">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="rounded-full bg-teal-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 transition hover:bg-teal-400 disabled:opacity-50"
-            >
-              {submitting ? "Saving…" : "Save"}
-            </button>
-          </div>
-        </form>
+        <CreateResourceModal config={config} onClose={() => setFormOpen(false)} onCreated={load} />
       )}
 
       <div className="flex flex-col rounded border border-zinc-800">
