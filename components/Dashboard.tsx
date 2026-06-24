@@ -10,28 +10,26 @@ export default function Dashboard() {
   const active = resourceConfigs[activeIndex];
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Wodify Clone Admin</h1>
-          <p className="text-sm text-zinc-500">
-            A self-contained clone of the Wodify API — browse and manage resources below.
-          </p>
+    <div className="flex min-h-screen flex-1 flex-col bg-zinc-950 text-zinc-100">
+      {/* App bar */}
+      <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-500 text-sm font-semibold text-zinc-950">
+          A
         </div>
-        <Link href="/portal" className="text-sm text-blue-600 hover:underline">
+        <h1 className="text-base font-semibold text-white">Wodify Clone Admin</h1>
+        <Link href="/portal" className="text-xs text-zinc-400 hover:text-zinc-200">
           Member Portal →
         </Link>
       </header>
 
-      <nav className="flex flex-wrap gap-2 border-b border-zinc-200 pb-2 dark:border-zinc-800">
+      {/* Tabs */}
+      <nav className="flex gap-6 overflow-x-auto border-b border-zinc-800 px-4">
         {resourceConfigs.map((cfg, i) => (
           <button
             key={cfg.title}
             onClick={() => setActiveIndex(i)}
-            className={`rounded px-3 py-1.5 text-sm ${
-              i === activeIndex
-                ? "bg-blue-600 text-white"
-                : "bg-zinc-100 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+            className={`shrink-0 border-b-2 px-1 py-3 text-sm font-medium transition ${
+              i === activeIndex ? "border-teal-400 text-teal-400" : "border-transparent text-zinc-500"
             }`}
           >
             {cfg.title}
@@ -39,7 +37,9 @@ export default function Dashboard() {
         ))}
       </nav>
 
-      <ResourceManager key={active.basePath} config={active} />
+      <div className="flex flex-1 flex-col gap-6 p-6">
+        <ResourceManager key={active.basePath} config={active} />
+      </div>
     </div>
   );
 }
