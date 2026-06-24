@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { POST as signup } from "@/app/api/v1/portal/signup/route";
 import { GET as listPortalClasses } from "@/app/api/v1/portal/classes/route";
+import { GET as getPortalClass } from "@/app/api/v1/portal/classes/[id]/route";
 import { POST as reserve } from "@/app/api/v1/portal/classes/[id]/reserve/route";
 import { GET as myReservations } from "@/app/api/v1/portal/reservations/route";
 import { PUT as cancelReservation } from "@/app/api/v1/portal/reservations/[id]/cancel/route";
@@ -123,5 +124,40 @@ describe("Portal classes & reservations", () => {
     );
     expect(ok.status).toBe(200);
     expect((await ok.json()).status).toBe("Cancelled");
+  });
+});
+
+describe("Portal class detail", () => {
+  it("requires a session", async () => {
+    const klass = await makeClass();
+    const res = await getPortalClass(makeRequest(`/api/v1/portal/classes/${klass.id}`), ctx(klass.id));
+    expect(res.status).toBe(401);
+  });
+
+  it("404s for a missing class", async () => {
+    const { cookie } = await signupAndGetCookie("detail404@test.com");
+    const res = await getPortalClass(
+      makeRequest("/api/v1/portal/classes/999999", { cookie }),
+      ctx(999999)
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("includes attendees and the viewer's own reservation status", async () => {
+    const klass = await makeClass(5);
+    const { cookie: cookieA } = await signupAndGetCookie("detailA@test.com");
+    const { cookie: cookieB } = await signupAndGetCookie("detailB@test.com");
+
+    await reserve(makeRequest(`/api/v1/portal/classes/${klass.id}/reserve`, { method: "POST", cookie: cookieA }), ctx(klass.id));
+
+    const asA = await getPortalClass(makeRequest(`/api/v1/portal/classes/${klass.id}`, { cookie: cookieA }), ctx(klass.id));
+    const bodyA = await asA.json();
+    expect(bodyA.attendees).toHaveLength(1);
+    expect(bodyA.myReservation?.status).toBe("Reserved");
+
+    const asB = await getPortalClass(makeRequest(`/api/v1/portal/classes/${klass.id}`, { cookie: cookieB }), ctx(klass.id));
+    const bodyB = await asB.json();
+    expect(bodyB.attendees).toHaveLength(1);
+    expect(bodyB.myReservation).toBeNull();
   });
 });

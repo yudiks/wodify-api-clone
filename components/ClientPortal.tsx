@@ -2,6 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import {
+  addDays,
+  avatarColor,
+  durationMinutes,
+  formatTimeLong,
+  formatTimeShort,
+  portalApi as api,
+  sameDay,
+  startOfWeek,
+  WEEKDAY_LABELS,
+} from "@/lib/portal-format";
 
 interface Client {
   id: number;
@@ -29,51 +40,6 @@ interface ReservationRow {
 }
 
 type Tab = "classes" | "reservations";
-
-async function api<T>(url: string, init?: RequestInit): Promise<{ ok: boolean; status: number; body: T }> {
-  const res = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-  });
-  const body = await res.json();
-  return { ok: res.ok, status: res.status, body };
-}
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const AVATAR_COLORS = ["bg-rose-500", "bg-amber-500", "bg-emerald-500", "bg-sky-500", "bg-violet-500", "bg-orange-500"];
-
-function startOfWeek(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - d.getDay());
-  return d;
-}
-
-function addDays(date: Date, days: number): Date {
-  return new Date(date.getTime() + days * DAY_MS);
-}
-
-function sameDay(a: Date, b: Date): boolean {
-  return a.toDateString() === b.toDateString();
-}
-
-function formatTimeShort(date: Date): string {
-  return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).toLowerCase().replace(" ", "");
-}
-
-function formatTimeLong(date: Date): string {
-  return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
-function durationMinutes(start: Date, end: Date): number {
-  return Math.round((end.getTime() - start.getTime()) / 60000);
-}
-
-function avatarColor(seed: string): string {
-  const code = seed.charCodeAt(0) || 0;
-  return AVATAR_COLORS[code % AVATAR_COLORS.length];
-}
 
 export default function ClientPortal() {
   const [client, setClient] = useState<Client | null | undefined>(undefined); // undefined = loading
@@ -399,12 +365,12 @@ export default function ClientPortal() {
 
                 return (
                   <div key={c.id} className="flex items-center gap-3 border-b border-zinc-800 px-4 py-3">
-                    <div className="w-16 shrink-0">
+                    <Link href={`/portal/classes/${c.id}`} className="w-16 shrink-0">
                       <div className="text-sm font-medium text-zinc-100">{formatTimeShort(start)}</div>
                       <div className="text-xs text-zinc-500">{durationMinutes(start, end)} min</div>
-                    </div>
+                    </Link>
 
-                    <div className="min-w-0 flex-1">
+                    <Link href={`/portal/classes/${c.id}`} className="min-w-0 flex-1">
                       <div className={`truncate text-sm ${reservation ? "font-medium text-teal-400" : "text-zinc-100"}`}>
                         {c.name}: {formatTimeLong(start)}
                       </div>
@@ -412,7 +378,7 @@ export default function ClientPortal() {
                         {reservedCount} | {c.capacity}
                         {c.program ? ` · ${c.program}` : ""}
                       </div>
-                    </div>
+                    </Link>
 
                     {reservation ? (
                       <span
@@ -456,14 +422,14 @@ export default function ClientPortal() {
             const start = new Date(r.class.startDateTime);
             return (
               <div key={r.id} className="flex items-center gap-3 border-b border-zinc-800 px-4 py-3">
-                <div className="w-16 shrink-0">
+                <Link href={`/portal/classes/${r.class.id}`} className="w-16 shrink-0">
                   <div className="text-sm font-medium text-zinc-100">{formatTimeShort(start)}</div>
                   <div className="text-xs text-zinc-500">{start.toLocaleDateString(undefined, { month: "short", day: "numeric" })}</div>
-                </div>
-                <div className="min-w-0 flex-1">
+                </Link>
+                <Link href={`/portal/classes/${r.class.id}`} className="min-w-0 flex-1">
                   <div className="truncate text-sm text-zinc-100">{r.class.name}</div>
                   <div className="mt-0.5 text-xs text-zinc-500">{r.status}</div>
-                </div>
+                </Link>
                 {r.status !== "Cancelled" && (
                   <button
                     onClick={() => handleCancel(r.id)}
