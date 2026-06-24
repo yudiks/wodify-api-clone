@@ -175,13 +175,16 @@ model WorkoutSection {
 }
 
 model WorkoutExercise {
-  id           Int            @id @default(autoincrement())
-  sectionId    Int
-  section      WorkoutSection @relation(fields: [sectionId], references: [id])
-  name         String
-  prescription String?
-  videoUrl     String?
-  position     Int            @default(0)
+  id            Int            @id @default(autoincrement())
+  sectionId     Int
+  section       WorkoutSection @relation(fields: [sectionId], references: [id])
+  name          String
+  prescription  String?
+  videoUrl      String?
+  position      Int            @default(0)
+  scored        Boolean        @default(false)
+  unit          String?
+  sortDirection String         @default("desc")
 
   results WorkoutResult[]
 }
@@ -193,5 +196,6 @@ model WorkoutResult {
   clientId    Int
   client      Client          @relation(fields: [clientId], references: [id])
   notes       String
+  score       Float?
   performedAt DateTime        @default(now())
 }

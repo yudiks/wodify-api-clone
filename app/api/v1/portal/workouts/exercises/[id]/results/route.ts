@@ -32,8 +32,14 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   const body = await request.json().catch(() => null);
   if (!body?.notes || !String(body.notes).trim()) return badRequest("notes is required");
 
+  let score: number | undefined;
+  if (body.score !== undefined && body.score !== null) {
+    score = Number(body.score);
+    if (!Number.isFinite(score)) return badRequest("score must be a number");
+  }
+
   const result = await prisma.workoutResult.create({
-    data: { exerciseId, clientId, notes: String(body.notes).trim() },
+    data: { exerciseId, clientId, notes: String(body.notes).trim(), score },
   });
   return jsonCreated(result);
 }

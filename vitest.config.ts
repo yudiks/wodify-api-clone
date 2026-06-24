@@ -1,5 +1,8 @@
+import { config } from "dotenv";
 import { defineConfig } from "vitest/config";
 import path from "node:path";
+
+config();
 
 export default defineConfig({
   test: {

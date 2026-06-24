@@ -1,8 +1,5 @@
-import { config } from "dotenv";
 import { beforeEach } from "vitest";
 import { prisma } from "@/lib/db";
-
-config();
 
 beforeEach(async () => {
   try {

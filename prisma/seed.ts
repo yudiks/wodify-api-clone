@@ -119,7 +119,7 @@ async function main() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  await prisma.workout.create({
+  const functionalFitness = await prisma.workout.create({
     data: {
       name: "Functional Fitness",
       program: "Functional Fitness",
@@ -151,6 +151,9 @@ async function main() {
                   prescription:
                     "Every 2 minutes, for 16 minutes (8 sets of):\nSets 1-3: Clean x 1.1 @ 65-75%\nSets 4-6: Clean x 1 @ 75-80%\nSets 7-8: Clean x 1 @ 80-85%",
                   position: 0,
+                  scored: true,
+                  unit: "lb",
+                  sortDirection: "desc",
                 },
               ],
             },
@@ -158,6 +161,22 @@ async function main() {
         ],
       },
     },
+    include: { sections: { include: { exercises: true } } },
+  });
+
+  const cleanExercise = functionalFitness.sections[1].exercises[0];
+
+  const thirdClient = await prisma.client.create({
+    data: { firstName: "Casey", lastName: "Nguyen", statusId: clientActive.id },
+  });
+
+  await prisma.workoutResult.createMany({
+    data: [
+      { exerciseId: cleanExercise.id, clientId: client.id, notes: "Clean 1RM attempt", score: 185 },
+      { exerciseId: cleanExercise.id, clientId: client.id, notes: "Clean 1RM attempt, second try", score: 195 },
+      { exerciseId: cleanExercise.id, clientId: otherClient.id, notes: "Clean 1RM attempt", score: 205 },
+      { exerciseId: cleanExercise.id, clientId: thirdClient.id, notes: "Clean 1RM attempt", score: 175 },
+    ],
   });
 
   console.log("Seed complete.");
