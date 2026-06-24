@@ -5,6 +5,8 @@ import { PUT as deactivate } from "@/app/api/v1/clients/[id]/deactivate/route";
 import { PUT as reactivate } from "@/app/api/v1/clients/[id]/reactivate/route";
 import { PUT as suspend } from "@/app/api/v1/clients/[id]/suspend/route";
 import { PUT as reinstate } from "@/app/api/v1/clients/[id]/reinstate/route";
+import { POST as createTemplate } from "@/app/api/v1/membership-templates/route";
+import { GET as listMemberships } from "@/app/api/v1/memberships/route";
 import { ctx, makeRequest } from "./helpers";
 
 async function createTestClient(firstName = "Test", lastName = "Client") {
@@ -65,5 +67,48 @@ describe("Clients API", () => {
   it("404s when toggling a missing client", async () => {
     const res = await deactivate(makeRequest("/api/v1/clients/999999/deactivate", { method: "PUT" }), ctx(999999));
     expect(res.status).toBe(404);
+  });
+
+  it("creates a client and enrolls them in a membership when membershipTemplateId is provided", async () => {
+    const template = await createTemplate(
+      makeRequest("/api/v1/membership-templates", { method: "POST", body: { name: "Unlimited", price: 99 } })
+    ).then((r) => r.json());
+
+    const res = await createClient(
+      makeRequest("/api/v1/clients", {
+        method: "POST",
+        body: { firstName: "Sam", lastName: "Smith", membershipTemplateId: template.id },
+      })
+    );
+    expect(res.status).toBe(201);
+    const client = await res.json();
+    expect(client.firstName).toBe("Sam");
+
+    const memberships = await listMemberships(makeRequest(`/api/v1/memberships?q=clientId|eq|${client.id}`)).then(
+      (r) => r.json()
+    );
+    expect(memberships.total).toBe(1);
+    expect(memberships.data[0].templateId).toBe(template.id);
+  });
+
+  it("rejects creation and creates no client when membershipTemplateId does not exist", async () => {
+    const res = await createClient(
+      makeRequest("/api/v1/clients", {
+        method: "POST",
+        body: { firstName: "Ghost", lastName: "Member", membershipTemplateId: 999999 },
+      })
+    );
+    expect(res.status).toBe(400);
+
+    const list = await listClients(makeRequest("/api/v1/clients")).then((r) => r.json());
+    expect(list.total).toBe(0);
+  });
+
+  it("creates a client without a membership when membershipTemplateId is omitted", async () => {
+    const client = await createTestClient("No", "Membership");
+    const memberships = await listMemberships(makeRequest(`/api/v1/memberships?q=clientId|eq|${client.id}`)).then(
+      (r) => r.json()
+    );
+    expect(memberships.total).toBe(0);
   });
 });
