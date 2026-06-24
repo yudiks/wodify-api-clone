@@ -40,13 +40,13 @@ async function api<T>(url: string, init?: RequestInit): Promise<{ ok: boolean; s
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const AVATAR_COLORS = ["bg-rose-500", "bg-amber-500", "bg-emerald-500", "bg-sky-500", "bg-violet-500", "bg-orange-500"];
 
 function startOfWeek(date: Date): Date {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
-  const isoWeekday = (d.getDay() + 6) % 7; // 0 = Monday
-  d.setDate(d.getDate() - isoWeekday);
+  d.setDate(d.getDate() - d.getDay());
   return d;
 }
 
@@ -58,6 +58,23 @@ function sameDay(a: Date, b: Date): boolean {
   return a.toDateString() === b.toDateString();
 }
 
+function formatTimeShort(date: Date): string {
+  return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).toLowerCase().replace(" ", "");
+}
+
+function formatTimeLong(date: Date): string {
+  return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function durationMinutes(start: Date, end: Date): number {
+  return Math.round((end.getTime() - start.getTime()) / 60000);
+}
+
+function avatarColor(seed: string): string {
+  const code = seed.charCodeAt(0) || 0;
+  return AVATAR_COLORS[code % AVATAR_COLORS.length];
+}
+
 export default function ClientPortal() {
   const [client, setClient] = useState<Client | null | undefined>(undefined); // undefined = loading
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
@@ -67,6 +84,11 @@ export default function ClientPortal() {
 
   const [tab, setTab] = useState<Tab>("classes");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [selectedDay, setSelectedDay] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [reservations, setReservations] = useState<ReservationRow[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -93,18 +115,21 @@ export default function ClientPortal() {
   }
 
   async function loadReservations() {
-    setLoadingData(true);
     const { body } = await api<{ data: ReservationRow[] }>("/api/v1/portal/reservations");
     setReservations(body.data ?? []);
-    setLoadingData(false);
   }
 
   useEffect(() => {
     if (!client) return;
-    if (tab === "classes") loadClasses();
-    else loadReservations();
+    loadClasses();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client, tab, weekStart]);
+  }, [client, weekStart]);
+
+  useEffect(() => {
+    if (!client) return;
+    loadReservations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client]);
 
   async function handleAuthSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -143,7 +168,7 @@ export default function ClientPortal() {
       setActionError(body.error ?? "Could not reserve");
       return;
     }
-    await loadClasses();
+    await Promise.all([loadClasses(), loadReservations()]);
   }
 
   async function handleCancel(reservationId: number) {
@@ -155,41 +180,51 @@ export default function ClientPortal() {
       setActionError(body.error ?? "Could not cancel");
       return;
     }
-    await loadReservations();
+    await Promise.all([loadClasses(), loadReservations()]);
+  }
+
+  function reservationFor(classId: number): ReservationRow | undefined {
+    return reservations.find((r) => r.class.id === classId && r.status !== "Cancelled");
   }
 
   if (client === undefined) {
-    return <div className="p-6 text-sm text-zinc-500">Loading…</div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-sm text-zinc-400">
+        Loading…
+      </div>
+    );
   }
 
   if (!client) {
     return (
-      <div className="flex flex-1 items-center justify-center p-6">
-        <div className="w-full max-w-sm rounded border border-zinc-200 p-6 dark:border-zinc-800">
-          <h1 className="mb-1 text-xl font-bold">Member Portal</h1>
-          <p className="mb-4 text-sm text-zinc-500">
+      <div className="flex min-h-screen flex-1 items-center justify-center bg-zinc-950 p-6">
+        <div className="w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+          <h1 className="mb-1 text-xl font-bold text-white">Member Portal</h1>
+          <p className="mb-4 text-sm text-zinc-400">
             {authMode === "signin" ? "Sign in to reserve classes." : "Create an account to get started."}
           </p>
 
           <div className="mb-4 flex gap-2 text-sm">
             <button
               onClick={() => setAuthMode("signin")}
-              className={`rounded px-3 py-1 ${authMode === "signin" ? "bg-blue-600 text-white" : "bg-zinc-100 dark:bg-zinc-900"}`}
+              className={`rounded px-3 py-1 transition ${
+                authMode === "signin" ? "bg-teal-500 text-zinc-950" : "bg-zinc-800 text-zinc-300"
+              }`}
             >
               Sign in
             </button>
             <button
               onClick={() => setAuthMode("signup")}
-              className={`rounded px-3 py-1 ${authMode === "signup" ? "bg-blue-600 text-white" : "bg-zinc-100 dark:bg-zinc-900"}`}
+              className={`rounded px-3 py-1 transition ${
+                authMode === "signup" ? "bg-teal-500 text-zinc-950" : "bg-zinc-800 text-zinc-300"
+              }`}
             >
               Sign up
             </button>
           </div>
 
           {authError && (
-            <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
-              {authError}
-            </p>
+            <p className="mb-3 rounded bg-red-950 px-3 py-2 text-sm text-red-300">{authError}</p>
           )}
 
           <form onSubmit={handleAuthSubmit} className="flex flex-col gap-3">
@@ -200,14 +235,14 @@ export default function ClientPortal() {
                   required
                   value={authForm.firstName}
                   onChange={(e) => setAuthForm((f) => ({ ...f, firstName: e.target.value }))}
-                  className="rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                  className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none"
                 />
                 <input
                   placeholder="Last name"
                   required
                   value={authForm.lastName}
                   onChange={(e) => setAuthForm((f) => ({ ...f, lastName: e.target.value }))}
-                  className="rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                  className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none"
                 />
               </>
             )}
@@ -217,7 +252,7 @@ export default function ClientPortal() {
               required
               value={authForm.email}
               onChange={(e) => setAuthForm((f) => ({ ...f, email: e.target.value }))}
-              className="rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none"
             />
             <input
               type="password"
@@ -226,18 +261,18 @@ export default function ClientPortal() {
               minLength={8}
               value={authForm.password}
               onChange={(e) => setAuthForm((f) => ({ ...f, password: e.target.value }))}
-              className="rounded border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none"
             />
             <button
               type="submit"
               disabled={authSubmitting}
-              className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              className="rounded bg-teal-500 px-3 py-1.5 text-sm font-medium text-zinc-950 transition hover:bg-teal-400 disabled:opacity-50"
             >
               {authSubmitting ? "Please wait…" : authMode === "signin" ? "Sign in" : "Sign up"}
             </button>
           </form>
 
-          <Link href="/" className="mt-4 block text-center text-xs text-zinc-500 hover:underline">
+          <Link href="/" className="mt-4 block text-center text-xs text-zinc-500 hover:text-zinc-300 hover:underline">
             Admin dashboard
           </Link>
         </div>
@@ -245,177 +280,201 @@ export default function ClientPortal() {
     );
   }
 
+  const dayClasses = classes
+    .filter((c) => sameDay(new Date(c.startDateTime), selectedDay))
+    .sort((a, b) => new Date(a.startDateTime).getTime() - new Date(b.startDateTime).getTime());
+
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Member Portal</h1>
-          <p className="text-sm text-zinc-500">
-            Welcome, {client.firstName} {client.lastName}
-          </p>
+    <div className="flex min-h-screen flex-1 flex-col bg-zinc-950 text-zinc-100">
+      {/* App bar */}
+      <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-500 text-sm font-semibold text-zinc-950">
+          {client.firstName[0]}
+          {client.lastName[0]}
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/" className="text-sm text-zinc-500 hover:underline">
-            Admin dashboard
+        <h1 className="text-base font-semibold text-white">Schedule</h1>
+        <div className="flex items-center gap-3 text-xs">
+          <Link href="/" className="text-zinc-400 hover:text-zinc-200">
+            Admin
           </Link>
-          <button onClick={handleSignOut} className="rounded bg-zinc-100 px-3 py-1.5 text-sm dark:bg-zinc-900">
+          <button onClick={handleSignOut} className="text-zinc-400 hover:text-zinc-200">
             Sign out
           </button>
         </div>
       </header>
 
-      <nav className="flex gap-2 border-b border-zinc-200 pb-2 dark:border-zinc-800">
+      {/* Tabs */}
+      <nav className="flex gap-6 border-b border-zinc-800 px-4">
         <button
           onClick={() => setTab("classes")}
-          className={`rounded px-3 py-1.5 text-sm ${tab === "classes" ? "bg-blue-600 text-white" : "bg-zinc-100 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"}`}
+          className={`border-b-2 px-1 py-3 text-sm font-medium transition ${
+            tab === "classes" ? "border-teal-400 text-teal-400" : "border-transparent text-zinc-500"
+          }`}
         >
           Classes
         </button>
         <button
           onClick={() => setTab("reservations")}
-          className={`rounded px-3 py-1.5 text-sm ${tab === "reservations" ? "bg-blue-600 text-white" : "bg-zinc-100 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"}`}
+          className={`border-b-2 px-1 py-3 text-sm font-medium transition ${
+            tab === "reservations" ? "border-teal-400 text-teal-400" : "border-transparent text-zinc-500"
+          }`}
         >
           My Reservations
         </button>
       </nav>
 
       {actionError && (
-        <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
-          {actionError}
-        </p>
+        <p className="mx-4 mt-3 rounded bg-red-950 px-3 py-2 text-sm text-red-300">{actionError}</p>
       )}
 
       {tab === "classes" && (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
+        <div className="flex flex-1 flex-col">
+          {/* Day strip */}
+          <div className="flex items-center gap-1 border-b border-zinc-800 px-2 py-3">
             <button
-              onClick={() => setWeekStart((d) => addDays(d, -7))}
-              className="rounded bg-zinc-100 px-3 py-1.5 text-sm dark:bg-zinc-900"
+              onClick={() => {
+                const prev = addDays(weekStart, -7);
+                setWeekStart(prev);
+                setSelectedDay(prev);
+              }}
+              className="px-1 text-zinc-500 hover:text-zinc-300"
+              aria-label="Previous week"
             >
-              ← Previous week
+              ‹
             </button>
-            <div className="text-sm font-medium">
-              {weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} –{" "}
-              {addDays(weekStart, 6).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setWeekStart(startOfWeek(new Date()))}
-                className="rounded bg-zinc-100 px-3 py-1.5 text-sm dark:bg-zinc-900"
-              >
-                Today
-              </button>
-              <button
-                onClick={() => setWeekStart((d) => addDays(d, 7))}
-                className="rounded bg-zinc-100 px-3 py-1.5 text-sm dark:bg-zinc-900"
-              >
-                Next week →
-              </button>
-            </div>
-          </div>
-
-          {loadingData && <div className="py-8 text-center text-sm text-zinc-500">Loading…</div>}
-
-          {!loadingData && (
-            <div className="grid grid-cols-1 gap-px overflow-hidden rounded border border-zinc-200 bg-zinc-200 sm:grid-cols-7 dark:border-zinc-800 dark:bg-zinc-800">
+            <div className="grid flex-1 grid-cols-7 text-center">
               {WEEKDAY_LABELS.map((label, i) => {
                 const day = addDays(weekStart, i);
+                const isSelected = sameDay(day, selectedDay);
                 const isToday = sameDay(day, new Date());
-                const dayClasses = classes
-                  .filter((c) => sameDay(new Date(c.startDateTime), day))
-                  .sort((a, b) => new Date(a.startDateTime).getTime() - new Date(b.startDateTime).getTime());
-
                 return (
-                  <div key={label} className="flex min-h-[10rem] flex-col gap-2 bg-white p-2 dark:bg-zinc-950">
-                    <div
-                      className={`flex items-baseline justify-between border-b pb-1 text-xs font-semibold ${
-                        isToday ? "border-blue-600 text-blue-600" : "border-zinc-200 text-zinc-500 dark:border-zinc-800"
+                  <button
+                    key={label}
+                    onClick={() => setSelectedDay(day)}
+                    className="flex flex-col items-center gap-1 py-1"
+                  >
+                    <span className={`text-[11px] ${isToday ? "text-zinc-300" : "text-zinc-500"}`}>{label}</span>
+                    <span
+                      className={`text-sm font-semibold ${
+                        isSelected
+                          ? "border-b-2 border-teal-400 pb-0.5 text-teal-400"
+                          : isToday
+                            ? "text-zinc-100"
+                            : "text-zinc-500"
                       }`}
                     >
-                      <span>{label}</span>
-                      <span>{day.toLocaleDateString(undefined, { month: "numeric", day: "numeric" })}</span>
-                    </div>
-
-                    {dayClasses.length === 0 && (
-                      <p className="text-xs text-zinc-400">No classes</p>
-                    )}
-
-                    {dayClasses.map((c) => (
-                      <div
-                        key={c.id}
-                        className="rounded border border-zinc-200 p-2 text-xs dark:border-zinc-800"
-                      >
-                        <div className="font-medium">{c.name}</div>
-                        <div className="text-zinc-500">
-                          {new Date(c.startDateTime).toLocaleTimeString(undefined, {
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}
-                          {c.program ? ` · ${c.program}` : ""}
-                        </div>
-                        <div className="mt-1 flex items-center justify-between">
-                          <span className={c.spotsRemaining > 0 ? "text-zinc-500" : "text-amber-600"}>
-                            {c.spotsRemaining > 0 ? `${c.spotsRemaining} spots left` : "Waitlist"}
-                          </span>
-                          <button
-                            onClick={() => handleReserve(c.id)}
-                            className="rounded bg-blue-600 px-2 py-0.5 text-xs text-white"
-                          >
-                            Reserve
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      {day.getDate()}
+                    </span>
+                  </button>
                 );
               })}
             </div>
-          )}
+            <button
+              onClick={() => {
+                const next = addDays(weekStart, 7);
+                setWeekStart(next);
+                setSelectedDay(next);
+              }}
+              className="px-1 text-zinc-500 hover:text-zinc-300"
+              aria-label="Next week"
+            >
+              ›
+            </button>
+          </div>
+
+          {/* Class list */}
+          <div className="flex flex-col">
+            {loadingData && <div className="py-8 text-center text-sm text-zinc-500">Loading…</div>}
+
+            {!loadingData && dayClasses.length === 0 && (
+              <div className="py-12 text-center text-sm text-zinc-500">No classes scheduled this day</div>
+            )}
+
+            {!loadingData &&
+              dayClasses.map((c) => {
+                const start = new Date(c.startDateTime);
+                const end = new Date(c.endDateTime);
+                const reservation = reservationFor(c.id);
+                const reservedCount = c.capacity - c.spotsRemaining;
+
+                return (
+                  <div key={c.id} className="flex items-center gap-3 border-b border-zinc-800 px-4 py-3">
+                    <div className="w-16 shrink-0">
+                      <div className="text-sm font-medium text-zinc-100">{formatTimeShort(start)}</div>
+                      <div className="text-xs text-zinc-500">{durationMinutes(start, end)} min</div>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className={`truncate text-sm ${reservation ? "font-medium text-teal-400" : "text-zinc-100"}`}>
+                        {c.name}: {formatTimeLong(start)}
+                      </div>
+                      <div className="mt-0.5 text-xs text-zinc-500">
+                        {reservedCount} | {c.capacity}
+                        {c.program ? ` · ${c.program}` : ""}
+                      </div>
+                    </div>
+
+                    {reservation ? (
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          reservation.status === "Waitlisted"
+                            ? "bg-amber-500/20 text-amber-300"
+                            : "bg-zinc-700 text-zinc-200"
+                        }`}
+                      >
+                        {reservation.status === "Waitlisted" ? "WAITLISTED" : "RESERVED"}
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleReserve(c.id)}
+                        className="shrink-0 rounded-full bg-teal-500 px-3 py-1 text-xs font-semibold text-zinc-950 transition hover:bg-teal-400"
+                      >
+                        Reserve
+                      </button>
+                    )}
+
+                    <div
+                      className={`hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white sm:flex ${avatarColor(
+                        c.program ?? c.name
+                      )}`}
+                    >
+                      {(c.program ?? c.name)[0]}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
         </div>
       )}
 
       {tab === "reservations" && (
-        <div className="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-100 dark:bg-zinc-900">
-              <tr>
-                <th className="px-3 py-2 font-medium">Class</th>
-                <th className="px-3 py-2 font-medium">Starts</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {loadingData && (
-                <tr>
-                  <td colSpan={4} className="px-3 py-4 text-center text-zinc-500">Loading…</td>
-                </tr>
-              )}
-              {!loadingData && reservations.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-3 py-4 text-center text-zinc-500">No reservations yet</td>
-                </tr>
-              )}
-              {!loadingData &&
-                reservations.map((r) => (
-                  <tr key={r.id} className="border-t border-zinc-100 dark:border-zinc-800">
-                    <td className="px-3 py-2">{r.class.name}</td>
-                    <td className="px-3 py-2">{new Date(r.class.startDateTime).toLocaleString()}</td>
-                    <td className="px-3 py-2">{r.status}</td>
-                    <td className="px-3 py-2 text-right">
-                      {r.status !== "Cancelled" && (
-                        <button
-                          onClick={() => handleCancel(r.id)}
-                          className="text-xs text-red-600 hover:underline"
-                        >
-                          Cancel
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
+        <div className="flex flex-col">
+          {reservations.length === 0 && (
+            <div className="py-12 text-center text-sm text-zinc-500">No reservations yet</div>
+          )}
+          {reservations.map((r) => {
+            const start = new Date(r.class.startDateTime);
+            return (
+              <div key={r.id} className="flex items-center gap-3 border-b border-zinc-800 px-4 py-3">
+                <div className="w-16 shrink-0">
+                  <div className="text-sm font-medium text-zinc-100">{formatTimeShort(start)}</div>
+                  <div className="text-xs text-zinc-500">{start.toLocaleDateString(undefined, { month: "short", day: "numeric" })}</div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm text-zinc-100">{r.class.name}</div>
+                  <div className="mt-0.5 text-xs text-zinc-500">{r.status}</div>
+                </div>
+                {r.status !== "Cancelled" && (
+                  <button
+                    onClick={() => handleCancel(r.id)}
+                    className="shrink-0 rounded-full border border-red-500/40 px-3 py-1 text-xs font-semibold text-red-400 hover:bg-red-500/10"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
