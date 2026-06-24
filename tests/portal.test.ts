@@ -37,7 +37,7 @@ describe("Portal classes & reservations", () => {
     const klass = await makeClass(2);
     const { cookie } = await signupAndGetCookie("browse@test.com");
 
-    const res = await listPortalClasses();
+    const res = await listPortalClasses(makeRequest("/api/v1/portal/classes"));
     const body = await res.json();
     expect(body.data).toHaveLength(1);
     expect(body.data[0].id).toBe(klass.id);

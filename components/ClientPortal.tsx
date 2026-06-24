@@ -39,6 +39,25 @@ async function api<T>(url: string, init?: RequestInit): Promise<{ ok: boolean; s
   return { ok: res.ok, status: res.status, body };
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function startOfWeek(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const isoWeekday = (d.getDay() + 6) % 7; // 0 = Monday
+  d.setDate(d.getDate() - isoWeekday);
+  return d;
+}
+
+function addDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * DAY_MS);
+}
+
+function sameDay(a: Date, b: Date): boolean {
+  return a.toDateString() === b.toDateString();
+}
+
 export default function ClientPortal() {
   const [client, setClient] = useState<Client | null | undefined>(undefined); // undefined = loading
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
@@ -47,6 +66,7 @@ export default function ClientPortal() {
   const [authSubmitting, setAuthSubmitting] = useState(false);
 
   const [tab, setTab] = useState<Tab>("classes");
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [reservations, setReservations] = useState<ReservationRow[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -63,7 +83,11 @@ export default function ClientPortal() {
 
   async function loadClasses() {
     setLoadingData(true);
-    const { body } = await api<{ data: ClassRow[] }>("/api/v1/portal/classes");
+    const from = weekStart.toISOString();
+    const to = addDays(weekStart, 7).toISOString();
+    const { body } = await api<{ data: ClassRow[] }>(
+      `/api/v1/portal/classes?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+    );
     setClasses(body.data ?? []);
     setLoadingData(false);
   }
@@ -80,7 +104,7 @@ export default function ClientPortal() {
     if (tab === "classes") loadClasses();
     else loadReservations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client, tab]);
+  }, [client, tab, weekStart]);
 
   async function handleAuthSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -262,49 +286,91 @@ export default function ClientPortal() {
       )}
 
       {tab === "classes" && (
-        <div className="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-100 dark:bg-zinc-900">
-              <tr>
-                <th className="px-3 py-2 font-medium">Class</th>
-                <th className="px-3 py-2 font-medium">Program</th>
-                <th className="px-3 py-2 font-medium">Starts</th>
-                <th className="px-3 py-2 font-medium">Location</th>
-                <th className="px-3 py-2 font-medium">Spots left</th>
-                <th className="px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {loadingData && (
-                <tr>
-                  <td colSpan={6} className="px-3 py-4 text-center text-zinc-500">Loading…</td>
-                </tr>
-              )}
-              {!loadingData && classes.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-3 py-4 text-center text-zinc-500">No upcoming classes</td>
-                </tr>
-              )}
-              {!loadingData &&
-                classes.map((c) => (
-                  <tr key={c.id} className="border-t border-zinc-100 dark:border-zinc-800">
-                    <td className="px-3 py-2">{c.name}</td>
-                    <td className="px-3 py-2">{c.program ?? "—"}</td>
-                    <td className="px-3 py-2">{new Date(c.startDateTime).toLocaleString()}</td>
-                    <td className="px-3 py-2">{c.location ?? "—"}</td>
-                    <td className="px-3 py-2">{c.spotsRemaining > 0 ? c.spotsRemaining : "Waitlist"}</td>
-                    <td className="px-3 py-2 text-right">
-                      <button
-                        onClick={() => handleReserve(c.id)}
-                        className="rounded bg-blue-600 px-2 py-1 text-xs text-white"
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setWeekStart((d) => addDays(d, -7))}
+              className="rounded bg-zinc-100 px-3 py-1.5 text-sm dark:bg-zinc-900"
+            >
+              ← Previous week
+            </button>
+            <div className="text-sm font-medium">
+              {weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} –{" "}
+              {addDays(weekStart, 6).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setWeekStart(startOfWeek(new Date()))}
+                className="rounded bg-zinc-100 px-3 py-1.5 text-sm dark:bg-zinc-900"
+              >
+                Today
+              </button>
+              <button
+                onClick={() => setWeekStart((d) => addDays(d, 7))}
+                className="rounded bg-zinc-100 px-3 py-1.5 text-sm dark:bg-zinc-900"
+              >
+                Next week →
+              </button>
+            </div>
+          </div>
+
+          {loadingData && <div className="py-8 text-center text-sm text-zinc-500">Loading…</div>}
+
+          {!loadingData && (
+            <div className="grid grid-cols-1 gap-px overflow-hidden rounded border border-zinc-200 bg-zinc-200 sm:grid-cols-7 dark:border-zinc-800 dark:bg-zinc-800">
+              {WEEKDAY_LABELS.map((label, i) => {
+                const day = addDays(weekStart, i);
+                const isToday = sameDay(day, new Date());
+                const dayClasses = classes
+                  .filter((c) => sameDay(new Date(c.startDateTime), day))
+                  .sort((a, b) => new Date(a.startDateTime).getTime() - new Date(b.startDateTime).getTime());
+
+                return (
+                  <div key={label} className="flex min-h-[10rem] flex-col gap-2 bg-white p-2 dark:bg-zinc-950">
+                    <div
+                      className={`flex items-baseline justify-between border-b pb-1 text-xs font-semibold ${
+                        isToday ? "border-blue-600 text-blue-600" : "border-zinc-200 text-zinc-500 dark:border-zinc-800"
+                      }`}
+                    >
+                      <span>{label}</span>
+                      <span>{day.toLocaleDateString(undefined, { month: "numeric", day: "numeric" })}</span>
+                    </div>
+
+                    {dayClasses.length === 0 && (
+                      <p className="text-xs text-zinc-400">No classes</p>
+                    )}
+
+                    {dayClasses.map((c) => (
+                      <div
+                        key={c.id}
+                        className="rounded border border-zinc-200 p-2 text-xs dark:border-zinc-800"
                       >
-                        Reserve
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
+                        <div className="font-medium">{c.name}</div>
+                        <div className="text-zinc-500">
+                          {new Date(c.startDateTime).toLocaleTimeString(undefined, {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                          {c.program ? ` · ${c.program}` : ""}
+                        </div>
+                        <div className="mt-1 flex items-center justify-between">
+                          <span className={c.spotsRemaining > 0 ? "text-zinc-500" : "text-amber-600"}>
+                            {c.spotsRemaining > 0 ? `${c.spotsRemaining} spots left` : "Waitlist"}
+                          </span>
+                          <button
+                            onClick={() => handleReserve(c.id)}
+                            className="rounded bg-blue-600 px-2 py-0.5 text-xs text-white"
+                          >
+                            Reserve
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
