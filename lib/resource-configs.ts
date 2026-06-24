@@ -38,6 +38,7 @@ export const resourceConfigs: ResourceConfig[] = [
       { key: "phone", label: "Phone", type: "text" },
     ],
     deletable: false,
+    useMemberModal: true,
   },
   {
     title: "Membership Templates",

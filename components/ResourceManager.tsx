@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AddMemberModal from "@/components/AddMemberModal";
 
 export type FieldType = "text" | "number" | "datetime" | "checkbox";
 
@@ -18,6 +19,7 @@ export interface ResourceConfig {
   fields: FieldConfig[];
   creatable?: boolean;
   deletable?: boolean;
+  useMemberModal?: boolean;
 }
 
 type Row = Record<string, unknown>;
@@ -124,7 +126,7 @@ export default function ResourceManager({ config }: { config: ResourceConfig }) 
               onClick={() => setFormOpen((v) => !v)}
               className="rounded-full bg-teal-500 px-3 py-1 text-xs font-semibold text-zinc-950 transition hover:bg-teal-400"
             >
-              {formOpen ? "Cancel" : "New"}
+              {config.useMemberModal ? "Add Member" : formOpen ? "Cancel" : "New"}
             </button>
           )}
         </div>
@@ -132,7 +134,11 @@ export default function ResourceManager({ config }: { config: ResourceConfig }) 
 
       {error && <p className="rounded bg-red-950 px-3 py-2 text-sm text-red-300">{error}</p>}
 
-      {formOpen && (
+      {formOpen && config.useMemberModal && (
+        <AddMemberModal onClose={() => setFormOpen(false)} onCreated={load} />
+      )}
+
+      {formOpen && !config.useMemberModal && (
         <form
           onSubmit={handleCreate}
           className="grid grid-cols-2 gap-3 rounded border border-zinc-800 p-3 sm:grid-cols-3"
