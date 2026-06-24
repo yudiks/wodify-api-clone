@@ -102,27 +102,27 @@ export default function ResourceManager({ config }: { config: ResourceConfig }) 
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 bg-zinc-950 text-zinc-100">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">{config.title}</h2>
+        <h2 className="text-lg font-semibold text-white">{config.title}</h2>
         <div className="flex items-center gap-2">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && load()}
             placeholder="q=field|eq|'value'"
-            className="rounded border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none"
           />
           <button
             onClick={load}
-            className="rounded bg-zinc-200 px-3 py-1 text-sm dark:bg-zinc-800"
+            className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-semibold text-zinc-300 transition hover:bg-zinc-700"
           >
             Search
           </button>
           {config.creatable !== false && (
             <button
               onClick={() => setFormOpen((v) => !v)}
-              className="rounded bg-blue-600 px-3 py-1 text-sm text-white"
+              className="rounded-full bg-teal-500 px-3 py-1 text-xs font-semibold text-zinc-950 transition hover:bg-teal-400"
             >
               {formOpen ? "Cancel" : "New"}
             </button>
@@ -130,22 +130,18 @@ export default function ResourceManager({ config }: { config: ResourceConfig }) 
         </div>
       </div>
 
-      {error && (
-        <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
-          {error}
-        </p>
-      )}
+      {error && <p className="rounded bg-red-950 px-3 py-2 text-sm text-red-300">{error}</p>}
 
       {formOpen && (
         <form
           onSubmit={handleCreate}
-          className="grid grid-cols-2 gap-3 rounded border border-zinc-200 p-3 dark:border-zinc-800 sm:grid-cols-3"
+          className="grid grid-cols-2 gap-3 rounded border border-zinc-800 p-3 sm:grid-cols-3"
         >
           {config.fields.map((field) => (
-            <label key={field.key} className="flex flex-col gap-1 text-sm">
+            <label key={field.key} className="flex flex-col gap-1 text-sm text-zinc-300">
               <span>
                 {field.label}
-                {field.required && <span className="text-red-500"> *</span>}
+                {field.required && <span className="text-red-400"> *</span>}
               </span>
               <input
                 type={field.type === "number" ? "number" : field.type === "datetime" ? "datetime-local" : "text"}
@@ -154,7 +150,7 @@ export default function ResourceManager({ config }: { config: ResourceConfig }) 
                 onChange={(e) =>
                   setFormValues((prev) => ({ ...prev, [field.key]: e.target.value }))
                 }
-                className="rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+                className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-teal-500 focus:outline-none"
               />
             </label>
           ))}
@@ -162,7 +158,7 @@ export default function ResourceManager({ config }: { config: ResourceConfig }) 
             <button
               type="submit"
               disabled={submitting}
-              className="rounded bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-50"
+              className="rounded-full bg-teal-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 transition hover:bg-teal-400 disabled:opacity-50"
             >
               {submitting ? "Saving…" : "Save"}
             </button>
@@ -170,55 +166,43 @@ export default function ResourceManager({ config }: { config: ResourceConfig }) 
         </form>
       )}
 
-      <div className="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-100 dark:bg-zinc-900">
-            <tr>
+      <div className="flex flex-col rounded border border-zinc-800">
+        {/* Header row */}
+        <div className="flex items-center border-b border-zinc-800 px-4 py-3">
+          {config.columns.map((col) => (
+            <div key={col.key} className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-500">
+              {col.label}
+            </div>
+          ))}
+          {config.deletable !== false && <div className="w-20 shrink-0" />}
+        </div>
+
+        {loading && <div className="py-12 text-center text-sm text-zinc-500">Loading…</div>}
+
+        {!loading && rows.length === 0 && (
+          <div className="py-12 text-center text-sm text-zinc-500">No records</div>
+        )}
+
+        {!loading &&
+          rows.map((row) => (
+            <div key={String(row.id)} className="flex items-center border-b border-zinc-800 px-4 py-3">
               {config.columns.map((col) => (
-                <th key={col.key} className="px-3 py-2 font-medium">
-                  {col.label}
-                </th>
+                <div key={col.key} className="min-w-0 flex-1 truncate text-sm text-zinc-100">
+                  {formatCell(row[col.key])}
+                </div>
               ))}
-              {config.deletable !== false && <th className="px-3 py-2" />}
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan={config.columns.length + 1} className="px-3 py-4 text-center text-zinc-500">
-                  Loading…
-                </td>
-              </tr>
-            )}
-            {!loading && rows.length === 0 && (
-              <tr>
-                <td colSpan={config.columns.length + 1} className="px-3 py-4 text-center text-zinc-500">
-                  No records
-                </td>
-              </tr>
-            )}
-            {!loading &&
-              rows.map((row) => (
-                <tr key={String(row.id)} className="border-t border-zinc-100 dark:border-zinc-800">
-                  {config.columns.map((col) => (
-                    <td key={col.key} className="px-3 py-2">
-                      {formatCell(row[col.key])}
-                    </td>
-                  ))}
-                  {config.deletable !== false && (
-                    <td className="px-3 py-2 text-right">
-                      <button
-                        onClick={() => handleDelete(row.id)}
-                        className="text-xs text-red-600 hover:underline"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-          </tbody>
-        </table>
+              {config.deletable !== false && (
+                <div className="w-20 shrink-0 text-right">
+                  <button
+                    onClick={() => handleDelete(row.id)}
+                    className="rounded-full border border-red-500/40 px-3 py-1 text-xs font-semibold text-red-400 hover:bg-red-500/10"
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
       </div>
     </div>
   );
